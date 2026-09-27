@@ -135,7 +135,7 @@ while IFS= read -r url; do
   {
     echo
     echo "## Referenced GitHub item: $url"
-    if ! gh api "/repos/$owner/$rrepo/issues/$number" 2>/dev/null | jq -r '".title | . // \"\""'; then
+    if ! gh api "/repos/$owner/$rrepo/issues/$number" 2>/dev/null | jq -r '"Title: \(.title // \"\")\nState: \(.state // \"unknown\")\n\(.body // \"\")"'; then
       references_complete=false
       context_degraded=true
     fi
