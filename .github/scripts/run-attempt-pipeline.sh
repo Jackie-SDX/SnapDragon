@@ -33,16 +33,42 @@ timed_out="false"
 [[ "$termination_reason" == "timeout" ]] && timed_out="true"
 safe_log_path="$(read_back safe_log_path)"
 agent_branch="$(read_back agent_branch)"
-session_head_sha=""
+session_head_sha="$(read_back session_head_sha)"
 durable_work="false"
+remote_dirty="false"
+remote_base_sha=""
 
-if [[ -n "$agent_branch" ]]; then
-  session_head_sha="$(git rev-parse "$agent_branch" 2>/dev/null || true)"
+if [[ "$mode" == "remote" && -n "${OC_TARGET_WORKSPACE:-}" && -d "${OC_TARGET_WORKSPACE:-}" ]]; then
+  remote_head="${session_head_sha:-$(git -C "$OC_TARGET_WORKSPACE" rev-parse HEAD 2>/dev/null || true)}"
+  remote_base="$(git -C "$OC_TARGET_WORKSPACE" rev-parse "origin/${OC_TARGET_BASE:-main}" 2>/dev/null || true)"
+  remote_dirty="$(git -C "$OC_TARGET_WORKSPACE" status --porcelain 2>/dev/null || true)"
+  if [[ -n "$remote_dirty" || ( "$remote_head" =~ ^[0-9a-f]{40}$ && "$remote_base" =~ ^[0-9a-f]{40}$ && "$remote_head" != "$remote_base" ) ]]; then
+    durable_work="true"
+  fi
+  [[ -n "$agent_branch" ]] || agent_branch="${OC_TARGET_BRANCH:-$(git -C "$OC_TARGET_WORKSPACE" branch --show-current 2>/dev/null || true)}"
+  session_head_sha="$remote_head"
+  remote_base_sha="$remote_base"
+elif [[ -n "$agent_branch" ]]; then
+  [[ -n "$session_head_sha" ]] || session_head_sha="$(git rev-parse "$agent_branch" 2>/dev/null || true)"
   if [[ "$initial_sha" =~ ^[0-9a-f]{40}$ && "$session_head_sha" =~ ^[0-9a-f]{40}$ && "$session_head_sha" != "$initial_sha" ]]; then
     durable_work="true"
   fi
 fi
 
+# Persist an actionable resume checkpoint whenever the attempt times out or durable work exists.
+if [[ "$termination_reason" == "timeout" || "$durable_work" == "true" ]]; then
+  OC_SESSION_PHASE="checkpointed" \
+  OC_SESSION_STATUS="active" \
+  OC_SESSION_MILESTONE="budget_or_progress_checkpoint" \
+  OC_SESSION_NEXT_ACTION="resume with /oc continue; recover the durable target branch, inspect current work and CI, and continue without repeating completed work" \
+  OC_SESSION_EVIDENCE="attempt=$attempt; termination=$termination_reason; target=${OC_TARGET_REPO:-local}; branch=${agent_branch:-unknown}; head=${session_head_sha:-unknown}; dirty=${remote_dirty:-unknown}; durable_work=$durable_work" \
+  OC_SESSION_BRANCH="$agent_branch" \
+  OC_SESSION_HEAD_SHA="$session_head_sha" \
+  OC_SESSION_ATTEMPT="$attempt" \
+  OC_TERMINATION_REASON="$termination_reason" \
+  OC_DURABLE_WORK="$durable_work" \
+  bash .github/scripts/record-oc-session-progress.sh || true
+fi
 publish_outcome="not-requested"
 pr_url="$(read_back pr_url)"
 publish_rc=0
