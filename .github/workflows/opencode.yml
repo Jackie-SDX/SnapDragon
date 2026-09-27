@@ -231,8 +231,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
+          OC_TARGET_MODE: ${{ steps.target.outputs.mode }}
+          OC_TARGET_REPO: ${{ steps.target.outputs.target_repo }}
+          OC_TARGET_BASE: ${{ steps.target.outputs.target_base }}
+          OC_TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
+          OC_TARGET_WORKSPACE: ${{ env.OC_TARGET_WORKSPACE }}
           BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
-          OPENCODE_AGENT_TIMEOUT_MINUTES: "350"
+          OPENCODE_AGENT_TIMEOUT_MINUTES: "330"
         shell: bash
         run: bash .github/scripts/post-oc-continuation.sh
 
@@ -245,7 +250,7 @@ jobs:
           OC_RUN_START_ISO: ${{ env.OC_RUN_START_ISO }}
           OC_JOB_START_EPOCH: ${{ env.OC_JOB_START_EPOCH }}
           OC_JOB_BUDGET_SECONDS: "21600"
-          OC_JOB_SAFETY_MARGIN_SECONDS: "120"
+          OC_JOB_SAFETY_MARGIN_SECONDS: "1800"
           OC_ISSUE_CONTEXT_FILE: ${{ env.OC_ISSUE_CONTEXT_FILE }}
           OC_CI_WATCH_MINUTES: "45"
           OC_CI_WATCH_POLL_SECONDS: "20"
