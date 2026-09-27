@@ -9,7 +9,9 @@ on:
 jobs:
   oc_claim:
     concurrency:
-      group: oc-claim-${{ github.event.comment.id || github.run_id }}
+      group: oc-claim-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: false
+      queue: max
     if: |
       github.event.comment.user.type == 'User' &&
       github.event.comment.user.login == github.repository_owner &&
@@ -44,8 +46,9 @@ jobs:
   opencode:
     needs: oc_claim
     concurrency:
-      group: oc-agent-${{ github.event.comment.id || github.run_id }}
+      group: oc-agent-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
+      queue: max
     if: |
       needs.oc_claim.outputs.accepted == 'true' &&
       github.event.comment.user.type == 'User' &&
@@ -115,6 +118,10 @@ jobs:
         env:
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
           OC_CONTEXT_MAX_BYTES: "2000000"
+          OC_TARGET_REPO: ${{ steps.target.outputs.target_repo }}
+          OC_TARGET_BASE: ${{ steps.target.outputs.target_base }}
+          OC_TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
+          OC_CONTEXT_CI_RUNS: "10"
         run: bash .github/scripts/collect-oc-context.sh
 
       - name: Classify command and prepare durable session
@@ -250,36 +257,6 @@ jobs:
           MERGE_EXIT: ${{ env.OC_MERGE_EXIT }}
         run: bash .github/scripts/post-oc-result.sh
 
-      - name: Final status
-        if: always()
-        env:
-          A1: ${{ steps.attempt_1.outputs.agent_outcome }}
-          DW1: ${{ steps.attempt_1.outputs.durable_work }}
-          CL1: ${{ steps.attempt_1.outputs.clarification_required }}
-          TASK_MODE: ${{ env.OC_TASK_MODE }}
-          MERGE_REQUESTED: ${{ env.OC_MERGE_REQUESTED }}
-          MERGE_EXIT: ${{ env.OC_MERGE_EXIT }}
-        run: |
-          set -euo pipefail
-          success=false
-          if [[ "$MERGE_REQUESTED" == "true" ]]; then [[ "$MERGE_EXIT" == "0" ]] && success=true; fi
-          if [[ "$CL1" == "true" ]]; then success=true; fi
-          if [[ "$TASK_MODE" == "report" && "$A1" == "success" ]]; then success=true; fi
-          if [[ "$A1" == "success" ]]; then success=true; fi
-          if [[ "$DW1" == "true" ]]; then success=true; fi
-          if [[ "$success" == "true" ]]; then
-            if [[ "$CL1" == "true" ]]; then
-              echo "Clarification requested; session is waiting for user input. Resume with /oc continue."
-            elif [[ "$A1" == "success" ]]; then
-              echo "OpenCode control-plane operation completed."
-            else
-              echo "Durable progress checkpointed; resume with /oc continue."
-            fi
-            exit 0
-          fi
-          echo "::error title=Agent operation not completed::No successful completion or durable checkpoint was produced."
-          exit 1
-
       - name: Persist session milestone
         if: always() && env.OC_SESSION_REQUIRED == 'true' && env.OC_TASK_MODE == 'code'
         continue-on-error: true
@@ -296,6 +273,48 @@ jobs:
           [[ "$CL1" != "true" && "$durable" == "true" ]] && phase=checkpointed && next="resume with /oc continue"
           [[ "$CL1" != "true" && "$A1" == "success" ]] && phase=completed && status=complete && next="await user direction"
           OC_DURABLE_WORK="$durable" OC_SESSION_PHASE="$phase" OC_SESSION_STATUS="$status" OC_SESSION_NEXT_ACTION="$next" bash .github/scripts/record-oc-session-progress.sh || true
+
+      - name: Final status
+        if: always()
+        env:
+          A1: ${{ steps.attempt_1.outputs.agent_outcome }}
+          DW1: ${{ steps.attempt_1.outputs.durable_work }}
+          CL1: ${{ steps.attempt_1.outputs.clarification_required }}
+          TASK_MODE: ${{ env.OC_TASK_MODE }}
+          MERGE_REQUESTED: ${{ env.OC_MERGE_REQUESTED }}
+          MERGE_EXIT: ${{ env.OC_MERGE_EXIT }}
+          RESULT_PUBLISHED: ${{ env.OC_RESULT_PUBLISHED || 'false' }}
+          MEMORY_PERSISTED: ${{ env.OC_SESSION_MEMORY_PERSISTED || 'false' }}
+        run: |
+          set -euo pipefail
+          success=false
+          if [[ "$MERGE_REQUESTED" == "true" ]]; then
+            [[ "$MERGE_EXIT" == "0" ]] && success=true
+          elif [[ "$CL1" == "true" ]]; then
+            [[ "$RESULT_PUBLISHED" == "true" && "$MEMORY_PERSISTED" == "true" ]] && success=true
+          elif [[ "$A1" == "success" ]]; then
+            [[ "$RESULT_PUBLISHED" == "true" && "$MEMORY_PERSISTED" == "true" ]] && success=true
+          elif [[ "$DW1" == "true" ]]; then
+            success=true
+          fi
+          if [[ "$success" == "true" ]]; then
+            if [[ "$CL1" == "true" ]]; then
+              echo "Clarification requested; session is waiting for user input. Resume with /oc continue."
+            elif [[ "$A1" == "success" ]]; then
+              echo "OpenCode completed and its final response plus durable session memory were verified."
+            else
+              echo "Durable progress checkpointed; resume with /oc continue."
+            fi
+            exit 0
+          fi
+          if [[ "$A1" == "success" && "$RESULT_PUBLISHED" != "true" ]]; then
+            echo "::error title=Final response not verified::OpenCode succeeded, but the final issue response was not verified as published."
+          elif [[ "$A1" == "success" && "$MEMORY_PERSISTED" != "true" ]]; then
+            echo "::error title=Session memory not verified::OpenCode succeeded, but durable session memory was not verified after the response."
+          else
+            echo "::error title=Agent operation not completed::No successful completion or durable checkpoint was produced."
+          fi
+          exit 1
 
       - name: Clean up remote target workspace
         if: always()
