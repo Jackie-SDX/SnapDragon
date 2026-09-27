@@ -59,7 +59,26 @@ JSON
 GITHUB_EVENT_PATH="$TESTS/event-issue-body-target.json" \
 GITHUB_REPOSITORY="Jackie-SDX/SnapDragon" TARGET_NUMBER=152 \
 bash "$SCRIPTS/resolve-oc-target.sh"
-grep -q '^mode=remotenew_output_files resolver-url-task-text
+grep -q '^mode=remote$' "$GITHUB_OUTPUT" && \
+grep -q '^target_repo=Jackie-SDX/cpp-project-template$' "$GITHUB_OUTPUT" && \
+grep -q '^target_source=issue-body$' "$GITHUB_OUTPUT" && \
+  ok "two-line issue-body Target repository field recovers a remote target for /oc continue" || \
+  bad "two-line issue-body Target repository field recovers a remote target for /oc continue"
+
+new_output_files resolver-issue-body-inline
+cat > "$TESTS/event-issue-body-inline.json" <<'JSON'
+{"comment":{"body":"/oc continue"},"issue":{"body":"Target repository: Jackie-SDX/cpp-project-template\n"}}
+JSON
+GITHUB_EVENT_PATH="$TESTS/event-issue-body-inline.json" \
+GITHUB_REPOSITORY="Jackie-SDX/SnapDragon" TARGET_NUMBER=152 \
+bash "$SCRIPTS/resolve-oc-target.sh"
+grep -q '^mode=remote$' "$GITHUB_OUTPUT" && \
+grep -q '^target_repo=Jackie-SDX/cpp-project-template$' "$GITHUB_OUTPUT" && \
+grep -q '^target_source=issue-body$' "$GITHUB_OUTPUT" && \
+  ok "inline issue-body Target repository field recovers a remote target for /oc continue" || \
+  bad "inline issue-body Target repository field recovers a remote target for /oc continue"
+
+new_output_files resolver-url-task-text
 make_event url-task-text "/oc check https://example.com/x:y and note repo: fix pipeline only"
 GITHUB_EVENT_PATH="$TESTS/event-url-task-text.json" \
 GITHUB_REPOSITORY="o/x" TARGET_NUMBER=0 bash "$SCRIPTS/resolve-oc-target.sh"
