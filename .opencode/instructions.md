@@ -63,7 +63,7 @@ These are action/progress summaries, not private chain-of-thought. Never expose 
 
 ## Ambiguity
 
-Resolve ambiguity from the repository, available tools, APIs, documentation, and live research whenever possible. Ask one focused clarification only when a material ambiguity genuinely blocks a safe decision, then preserve the session and resume it after the answer.
+Resolve material ambiguity from the repository, available tools, APIs, documentation, and live research when needed. Ask one focused clarification only when a material ambiguity genuinely blocks a safe decision, then preserve the session and resume it after the answer.
 
 ## Final response
 
@@ -77,7 +77,7 @@ Treat context as layered state:
 - compact durable /oc memory = goal, completed, remaining, tests/evidence, warnings, next action, target repo/branch/HEAD;
 - Git history, current branch/HEAD, working tree/diff, and live CI = execution truth.
 
-Every fresh runner must reread repository instructions, durable memory, current issue/PR history, current Git state, and live CI/Actions state when available. Runner-local session data is cache only.
-When context retrieval is marked degraded, do not assume the bounded seed is complete; recover missing evidence directly from GitHub, the repository, and live CI before acting.
+Start with the user's current request. Retrieve durable memory, issue/PR history, repository state, or live CI only when the request or the agent's reasoning shows that context is needed. Runner-local session data is cache only.
+If you deliberately retrieve context and that retrieval is marked degraded, do not treat the missing portions as known; recover only the missing evidence that matters to the current request.
 Durable memory is issue-scoped and target-scoped. Never copy or reuse another issue's session memory unless the current request explicitly continues that exact target.
 Keep durable memory compact and factual; never turn it into a transcript. When context grows large, checkpoint and continue from the compact state rather than ending early.
