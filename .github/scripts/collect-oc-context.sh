@@ -15,6 +15,18 @@ mkdir -p "$runner_temp"
 : > "$full"; : > "$index"; : > "$refs"
 [[ "$target" =~ ^[0-9]+$ && "$target" != 0 && -n "$repo" ]] || exit 0
 
+context_degraded=false
+issue_comments_complete=true
+ci_complete=true
+ci_file="$runner_temp/oc-live-ci.md"
+ci_runs_json="$runner_temp/oc-live-ci-runs.json"
+ci_checks_json="$runner_temp/oc-live-ci-checks.json"
+: > "$ci_file"; : > "$ci_runs_json"; : > "$ci_checks_json"
+target_repo="${OC_TARGET_REPO:-$repo}"
+target_base="${OC_TARGET_BASE:-main}"
+target_branch="${OC_TARGET_BRANCH:-}"
+target_head_sha=""
+
 issue_json="$(mktemp)"
 trap 'rm -f "$issue_json"' EXIT
 gh api "/repos/$repo/issues/$target" > "$issue_json"
@@ -57,7 +69,13 @@ while IFS= read -r encoded; do
   printf '%s\t%s\t%s\t%s\n' "$id" "$created" "$start" "$end" >> "$index"
   comment_count=$((comment_count + 1))
   last_comment_id="$id"
-done < <(gh api --paginate --jq '.[] | [.id, .user.login, .created_at, .body] | @base64' "/repos/$repo/issues/$target/comments?per_page=100" 2>/dev/null || true)
+comments_tmp="$runner_temp/oc-comments-jsonl"
+if ! gh api --paginate --jq '.[] | [.id, .user.login, .created_at, .body] | @base64' "/repos/$repo/issues/$target/comments?per_page=100" > "$comments_tmp"; then
+  issue_comments_complete=false
+  context_degraded=true
+  : > "$comments_tmp"
+fi
+done < "$comments_tmp"
 
 echo "## Pull-request review comments (chronological)" >> "$full"
 while IFS= read -r encoded; do
@@ -96,6 +114,62 @@ while IFS= read -r url; do
   } >> "$refs"
 done < <(printf '%s\n' "$reference_urls" | sort -u | head -n 5)
 
+# Live CI state is an independent recovery source when durable memory is absent.
+if [[ -n "$target_branch" ]]; then
+  target_head_sha="$(gh api "/repos/$target_repo/commits/$target_branch" --jq '.sha // empty' 2>/dev/null || true)"
+fi
+if [[ -z "$target_head_sha" && "$target_repo" == "$repo" ]]; then
+  target_head_sha="$(git rev-parse HEAD 2>/dev/null || true)"
+fi
+{
+  echo
+  echo "## Live CI / GitHub Actions state"
+  echo "- Target repository: $target_repo"
+  echo "- Target base: $target_base"
+  echo "- Target branch: ${target_branch:-unknown}"
+  echo "- Target HEAD: ${target_head_sha:-unknown}"
+} >> "$full"
+
+if [[ -n "$target_head_sha" ]]; then
+  if gh api "/repos/$target_repo/commits/$target_head_sha/check-runs?per_page=50" > "$ci_checks_json"; then
+    echo "### Check runs for HEAD" >> "$full"
+    jq -r '.check_runs[]? | "- (.name): status=(.status) conclusion=(.conclusion // "pending") (.html_url // "")"' "$ci_checks_json" >> "$full" 2>/dev/null || true
+  else
+    ci_complete=false
+    context_degraded=true
+    echo "- Check-run retrieval failed." >> "$full"
+  fi
+fi
+
+if [[ -n "$target_head_sha" ]]; then
+  if ! gh api --paginate -f "head_sha=$target_head_sha" -f "per_page=${OC_CONTEXT_CI_RUNS:-10}" "/repos/$target_repo/actions/runs" > "$ci_runs_json"; then
+    ci_complete=false
+    context_degraded=true
+  fi
+elif [[ -n "$target_branch" ]]; then
+  if ! gh api --paginate -f "branch=$target_branch" -f "per_page=${OC_CONTEXT_CI_RUNS:-10}" "/repos/$target_repo/actions/runs" > "$ci_runs_json"; then
+    ci_complete=false
+    context_degraded=true
+  fi
+else
+  if ! gh api --paginate -f "per_page=${OC_CONTEXT_CI_RUNS:-10}" "/repos/$target_repo/actions/runs" > "$ci_runs_json"; then
+    ci_complete=false
+    context_degraded=true
+  fi
+fi
+
+echo "### Recent workflow runs" >> "$full"
+if [[ -s "$ci_runs_json" ]]; then
+  jq -r '.workflow_runs[]? | "- run (.id): (.name // "unknown") — status=(.status // "unknown") conclusion=(.conclusion // "pending") branch=(.head_branch // "detached") sha=(.head_sha // "") (.html_url // "")"' "$ci_runs_json" | head -n "${OC_CONTEXT_CI_RUNS:-10}" >> "$full" 2>/dev/null || true
+  jq -r '[.workflow_runs[]?.id] | map(select(. != null)) | map(tostring) | join(",")' "$ci_runs_json" 2>/dev/null > "$runner_temp/oc-ci-run-ids" || : > "$runner_temp/oc-ci-run-ids"
+else
+  echo "- No workflow runs returned for the selected target/head." >> "$full"
+  : > "$runner_temp/oc-ci-run-ids"
+fi
+if [[ "$ci_complete" != "true" ]]; then
+  echo "- CI context retrieval is degraded; re-read live Actions/checks before relying on it." >> "$full"
+fi
+
 full_size="$(wc -c < "$full")"
 {
   head -c "$seed_bytes" "$full"
@@ -113,6 +187,13 @@ full_size="$(wc -c < "$full")"
   printf 'OC_ISSUE_COMMENT_COUNT=%s\n' "$comment_count"
   printf 'OC_ISSUE_LAST_COMMENT_ID=%s\n' "$last_comment_id"
   printf 'OC_ISSUE_CONTEXT_BYTES=%s\n' "$full_size"
+  printf 'OC_CONTEXT_DEGRADED=%s\n' "$context_degraded"
+  printf 'OC_CONTEXT_ISSUE_COMMENTS_COMPLETE=%s\n' "$issue_comments_complete"
+  printf 'OC_CONTEXT_CI_COMPLETE=%s\n' "$ci_complete"
+  printf 'OC_CONTEXT_CI_FILE=%s\n' "$ci_file"
+  printf 'OC_CONTEXT_CI_RUN_IDS=%s\n' "$(cat "$runner_temp/oc-ci-run-ids" 2>/dev/null || true)"
+  printf 'OC_CONTEXT_TARGET_REPOSITORY=%s\n' "$target_repo"
+  printf 'OC_CONTEXT_TARGET_HEAD_SHA=%s\n' "$target_head_sha"
 } >> "${GITHUB_OUTPUT:-/dev/null}"
 {
   printf 'OC_ISSUE_CONTEXT_FILE=%s\n' "$full"
@@ -122,6 +203,17 @@ full_size="$(wc -c < "$full")"
   printf 'OC_ISSUE_COMMENT_COUNT=%s\n' "$comment_count"
   printf 'OC_ISSUE_LAST_COMMENT_ID=%s\n' "$last_comment_id"
   printf 'OC_ISSUE_CONTEXT_BYTES=%s\n' "$full_size"
+  printf 'OC_CONTEXT_DEGRADED=%s\n' "$context_degraded"
+  printf 'OC_CONTEXT_ISSUE_COMMENTS_COMPLETE=%s\n' "$issue_comments_complete"
+  printf 'OC_CONTEXT_CI_COMPLETE=%s\n' "$ci_complete"
+  printf 'OC_CONTEXT_CI_FILE=%s\n' "$ci_file"
+  printf 'OC_CONTEXT_CI_RUN_IDS=%s\n' "$(cat "$runner_temp/oc-ci-run-ids" 2>/dev/null || true)"
+  printf 'OC_CONTEXT_TARGET_REPOSITORY=%s\n' "$target_repo"
+  printf 'OC_CONTEXT_TARGET_HEAD_SHA=%s\n' "$target_head_sha"
 } >> "${GITHUB_ENV:-/dev/null}"
 
-echo "Captured complete issue context: $full ($full_size bytes, comments=$comment_count)"
+if [[ "$context_degraded" == "true" ]]; then
+  echo "::warning title=/oc context degraded::One or more issue/comment/CI context sources could not be verified. The agent must use live repository, issue/PR, and CI reads before acting."
+else
+  echo "Captured complete issue context plus live CI state: $full ($full_size bytes, comments=$comment_count)"
+fi
