@@ -86,6 +86,8 @@ jobs:
       OC_CI_WATCH_MINUTES: "45"
       OC_CI_WATCH_POLL_SECONDS: "20"
       OC_CAPABILITY_AUTO_INSTALL: "false"
+      OC_CONTEXT_MODE: "on-demand"
+      OC_CONTEXT_COLLECTOR: ".github/scripts/collect-oc-context.sh"
 
     steps:
       - name: Checkout repository
@@ -111,18 +113,6 @@ jobs:
         env:
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
         run: bash .github/scripts/resolve-oc-target.sh
-
-      - name: Capture bounded task context
-        id: context
-        shell: bash
-        env:
-          TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
-          OC_CONTEXT_MAX_BYTES: "2000000"
-          OC_TARGET_REPO: ${{ steps.target.outputs.target_repo }}
-          OC_TARGET_BASE: ${{ steps.target.outputs.target_base }}
-          OC_TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
-          OC_CONTEXT_CI_RUNS: "10"
-        run: bash .github/scripts/collect-oc-context.sh
 
       - name: Classify command and prepare durable session
         id: task_mode
