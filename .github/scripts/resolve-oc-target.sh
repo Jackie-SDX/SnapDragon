@@ -208,10 +208,27 @@ fi
 # Keep this deliberately narrow so arbitrary URLs in task text never become
 # remote targets.
 if [[ "$mode" == "local" && -n "$issue_body" ]]; then
-  issue_target_line="$(printf '%s\n' "$issue_body" | grep -Eim1 '^[[:space:]]*Target[[:space:]]+(repository|repo)[[:space:]]*:[[:space:]]*[^[:space:]]+' || true)"
-  if [[ -n "$issue_target_line" ]]; then
-    issue_target="${issue_target_line#*:}"
-    issue_target="$(printf '%s' "$issue_target" | sed -E 's/^\s+//; s/\s+$//')"
+  # Accept both documented forms:
+  #   Target repository: OWNER/REPO
+  # and
+  #   Target repository:
+  #   https://github.com/OWNER/REPO
+  issue_target="$(
+    awk '
+      /^[[:space:]]*Target[[:space:]]+(repository|repo)[[:space:]]*:/ {
+        line=$0
+        sub(/^[^:]*:[[:space:]]*/, "", line)
+        if (line != "") { print line; exit }
+        if (getline nextline > 0) {
+          sub(/^[[:space:]]*/, "", nextline)
+          print nextline
+          exit
+        }
+      }
+    ' <<<"$issue_body"
+  )"
+  if [[ -n "$issue_target" ]]; then
+    issue_target="$(printf '%s' "$issue_target" | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
     issue_target="${issue_target#https://github.com/}"
     issue_target="${issue_target#http://github.com/}"
     issue_target="${issue_target#github.com/}"
