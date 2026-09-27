@@ -106,28 +106,6 @@ context_refs="$(printenv OC_REFERENCE_CONTEXT_FILE 2>/dev/null || true)"
 [ -n "$context_full" ] || context_full="$runner_temp/oc-issue-context-full.md"
 [ -n "$context_refs" ] || context_refs="$runner_temp/oc-reference-context.md"
 
-capture_final_response() {
-  if [[ -s "$final_response_file" ]]; then return 0; fi
-  local sessions_file session_id export_file answer_file cwd
-  sessions_file="$runner_temp/opencode-sessions-$attempt.json"
-  opencode session list --max-count 100 --format json >"$sessions_file" 2>/dev/null || printf '[]\n' >"$sessions_file"
-  cwd="$(realpath "$agent_cwd" 2>/dev/null || printf "%s" "$agent_cwd")"
-  session_id="$(jq -r --arg cwd "$cwd" '[.[] | select((.directory // "") == $cwd)] | sort_by(.updated // .created // 0) | last.id // ""' "$sessions_file" 2>/dev/null || true)"
-  if [[ -z "$session_id" ]]; then
-    session_id="$(jq -r 'sort_by(.updated // .created // 0) | last.id // ""' "$sessions_file" 2>/dev/null || true)"
-  fi
-  [[ -n "$session_id" ]] || return 0
-  export_file="$runner_temp/opencode-export-$attempt.json"
-  rm -f "$export_file"
-  opencode export "$session_id" --sanitize >"$export_file" 2>/dev/null || return 0
-  answer_file="$runner_temp/opencode-answer-$attempt.md"
-  : >"$answer_file"
-  jq -r 'if (.messages|type) == "array" then (.messages | map(select(.info?.role=="assistant")) | last | [.parts[]? | select(.type=="text" and (.text|type=="string")) | .text] | join("\n\n")) elif type=="array" then (map(select(.info?.role=="assistant")) | last | [.parts[]? | select(.type=="text" and (.text|type=="string")) | .text] | join("\n\n")) else empty end' "$export_file" >"$answer_file" 2>/dev/null || true
-  if [[ -s "$answer_file" ]]; then cp "$answer_file" "$final_response_file"; fi
-  rm -f "$sessions_file" "$export_file" "$answer_file"
-  [[ -s "$final_response_file" ]]
-}
-
 agent_cmd=()
 if [[ "${OC_TARGET_MODE:-local}" == "remote" ]]; then
   ws="${OC_TARGET_WORKSPACE:-}"
@@ -143,7 +121,7 @@ if [[ "${OC_TARGET_MODE:-local}" == "remote" ]]; then
   [[ -n "$task_prompt" ]] || task_prompt="Inspect the target repository workspace and implement the requested change. Work inside this repository only; use its own project instructions. You may commit, push, create/update PRs, inspect CI, repair failures, and merge when the user explicitly requests that lifecycle step. Never force-push, rewrite protected history, bypass branch protection, expose credentials, or make unrelated changes."
   model_name="${MODEL:-opencode/mimo-v2.6-flash-free}"
   task_prompt="$task_prompt"$'\n\n'"$activity_guidance"
-  agent_cmd=(opencode run --thinking --dir "$ws" --model "$model_name")
+  agent_cmd=(opencode run --thinking --format json --dir "$ws" --model "$model_name")
   [[ -n "${VARIANT:-}" ]] && agent_cmd+=(--variant "$VARIANT")
   agent_cmd+=(--agent build --title "oc remote ${OC_TARGET_REPO:-target}")
 else
@@ -178,7 +156,7 @@ else
     task_prompt="Execute the user's latest request directly. Start from the request itself. Do not assume repository inspection, issue-history retrieval, durable-memory loading, or CI inspection is necessary. Decide whether additional context is actually needed for this request; retrieve it only when it materially helps answer or execute the request."
   fi
   task_prompt="$task_prompt"$'\n\n'"$activity_guidance"
-  agent_cmd=(opencode run --thinking --dir "$agent_cwd" --model "$model_name")
+  agent_cmd=(opencode run --thinking --format json --dir "$agent_cwd" --model "$model_name")
   [[ -n "${VARIANT:-}" ]] && agent_cmd+=(--variant "$VARIANT")
   agent_cmd+=(--agent build --title "oc local ${TARGET_NUMBER:-issue}")
 fi
@@ -322,8 +300,57 @@ heartbeat &
 heartbeat_pid=$!
 
 while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
-  safe_line="$(sanitize_line "$raw_line")"
-  printf "%s\n" "$safe_line"
+  if jq -e . >/dev/null 2>&1 <<<"$raw_line"; then
+    event_type="$(jq -r '.type // empty' <<<"$raw_line")"
+    case "$event_type" in
+      text)
+        event_text="$(jq -r '.part.text // empty' <<<"$raw_line")"
+        synthetic="$(jq -r '.part.synthetic // false' <<<"$raw_line")"
+        ignored="$(jq -r '.part.ignored // false' <<<"$raw_line")"
+        compaction_continue="$(jq -r '.part.metadata.compaction_continue // false' <<<"$raw_line")"
+        if [[ "$synthetic" != "true" && "$ignored" != "true" && "$compaction_continue" != "true" && -n "$event_text" ]]; then
+          event_text="$(sanitize_line "$event_text")"
+          printf "%s\n" "$event_text" > "$final_response_file"
+          printf "%s\n" "$event_text"
+        fi
+        ;;
+      reasoning)
+        event_text="$(jq -r '.part.text // empty' <<<"$raw_line")"
+        [[ -n "$event_text" ]] || continue
+        event_text="$(sanitize_line "$event_text")"
+        printf "Thinking: %s\n" "$event_text"
+        ;;
+      tool_use)
+        tool_name="$(jq -r '.part.tool // empty' <<<"$raw_line")"
+        tool_status="$(jq -r '.part.state.status // empty' <<<"$raw_line")"
+        [[ -n "$tool_name" ]] || continue
+        if [[ -n "$tool_status" ]]; then
+          printf "|%s %s\n" "$tool_name" "$tool_status"
+        else
+          printf "|%s\n" "$tool_name"
+        fi
+        ;;
+      step_start)
+        printf "OC-STATUS: step started\n"
+        ;;
+      step_finish)
+        step_reason="$(jq -r '.part.reason // empty' <<<"$raw_line")"
+        if [[ -n "$step_reason" ]]; then
+          printf "OC-DONE: %s\n" "$(sanitize_line "$step_reason")"
+        else
+          printf "OC-DONE: step finished\n"
+        fi
+        ;;
+      error)
+        error_text="$(jq -r '.error.data.message // .error.message // empty' <<<"$raw_line")"
+        [[ -n "$error_text" ]] || error_text="OpenCode reported an error."
+        printf "ERROR: %s\n" "$(sanitize_line "$error_text")"
+        ;;
+    esac
+  else
+    safe_line="$(sanitize_line "$raw_line")"
+    printf "%s\n" "$safe_line"
+  fi
 done < "$fifo" | awk -f "$script_dir/filter-opencode-live-output.awk" | tee -a "$safe_log"
 wait "$agent_pid"
 exit_code=$?
@@ -362,7 +389,9 @@ set -e
 
 elapsed=$(( $(date +%s) - start_epoch ))
 termination_reason="completed"
-capture_final_response || true
+if [[ -s "$final_response_file" ]]; then
+  printf "[OC][attempt=%s][elapsed=%ss] final response captured from structured event stream\n" "$attempt" "$elapsed" | tee -a "$progress_log"
+fi
 provider_warning="false"
 case "$exit_code" in
   124) termination_reason="timeout" ;;
