@@ -9,6 +9,9 @@ set -euo pipefail
 bash .github/scripts/select-oc-task-mode.sh
 bash .github/scripts/oc-session-state.sh load
 
+# Every /oc request gets an initial compact checkpoint in the issue/PR body.
+OC_SESSION_PHASE=received OC_SESSION_STATUS=active OC_SESSION_MILESTONE="request_received" OC_SESSION_NEXT_ACTION="inspect current issue context and Git state" OC_DURABLE_WORK=false bash .github/scripts/record-oc-session-progress.sh || true
+
 # select-oc-task-mode.sh publishes classification to the GITHUB_OUTPUT/GITHUB_ENV
 # files, which the runner only applies to the NEXT step. Read the values back
 # from the output file so the same-step decision below can use them.
@@ -29,10 +32,11 @@ read_back_output() {
 session_required="$(read_back_output OC_SESSION_REQUIRED)"
 task_mode="$(read_back_output OC_TASK_MODE)"
 merge_requested="$(read_back_output OC_MERGE_REQUESTED)"
+branch_required="$(read_back_output OC_SESSION_BRANCH_REQUIRED)"
 session_branch="$(read_back_output OC_SESSION_BRANCH)"
 target_mode="$(read_back_output OC_TARGET_MODE)"
 
-if [[ "${session_required:-false}" == "true" && "${task_mode:-}" == "code" ]]; then
+if [[ "${session_required:-false}" == "true" && "${branch_required:-false}" == "true" && "${task_mode:-}" == "code" ]]; then
   if [[ "${target_mode:-local}" == "remote" ]]; then
     # Remote-target durability belongs to the target repository. Do not create
     # a controller-local session branch that can make /oc continue resume the

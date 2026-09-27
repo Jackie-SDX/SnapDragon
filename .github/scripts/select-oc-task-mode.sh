@@ -18,6 +18,7 @@ if [[ "$lower" =~ ^continue([[:space:]]|$) ]] &&
    ! printf '%s' "$lower" | grep -Eiq '\b(story|stories|chapter|fiction|poem|poetry|essay|prose|dialogue|joke|caption|lyrics?|creative|co-?author|part[[:space:]-]*[0-9]+)\b'; then
   resume_requested=true
   session_required=true
+  branch_required=true
   mode=code
   intent=continue
   request="$(printf '%s' "$request" | sed -E 's#^continue[[:space:]]*##')"
@@ -25,6 +26,7 @@ if [[ "$lower" =~ ^continue([[:space:]]|$) ]] &&
 elif [[ "$lower" =~ ^merge([[:space:]]|$) ]]; then
   merge_requested=true
   session_required=true
+  branch_required=true
   mode=merge
   intent=merge
 else
@@ -32,9 +34,11 @@ else
 
   if printf '%s' "$positive_request" | grep -Eiq '\b(create|open|publish|submit)[[:space:]]+(a[[:space:]]+)?(pull[[:space:]-]*request|pr)\b'; then
     session_required=true
+    branch_required=true
     intent=publish
   elif printf '%s' "$positive_request" | grep -Eiq '\b(fix|edit|change|modify|implement|add|remove|create|delete|refactor|debug|repair|update|build|write|test|patch|migrate|replace|rename|commit|push|merge|release)\b'; then
     session_required=true
+    branch_required=true
     intent=code
   fi
 fi
@@ -64,5 +68,6 @@ emit_env OC_INTENT "$intent"
 emit_env OC_RESUME_REQUESTED "$resume_requested"
 emit_env OC_MERGE_REQUESTED "$merge_requested"
 emit_env OC_SESSION_REQUIRED "$session_required"
+emit_env OC_SESSION_BRANCH_REQUIRED "$branch_required"
 
 echo "Selected /oc mode=$mode intent=$intent resume=$resume_requested merge=$merge_requested"

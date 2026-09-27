@@ -86,18 +86,20 @@ export_state(){
   emit_out phase "$(jq -r '.phase // "unknown"' "$state_file")"
 }
 
+valid_json() { [[ -n "$(printf "%s" "$1" | tr -d "[:space:]")" ]] && jq -e 'type=="object"' >/dev/null 2>&1 <<<"$1"; }
+
 case "$cmd" in
   load)
     body="$(issue_body)"
     json="$(extract_block "$body" "$memory_marker" "$memory_end" | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
-    if ! jq empty <<<"$json" >/dev/null 2>&1; then
+    if ! valid_json "$json"; then
       id="$(legacy_comment_id || true)"
       if [[ "$id" =~ ^[0-9]+$ ]]; then
         raw="$(gh api "/repos/$repo/issues/comments/$id" --jq '.body // ""' 2>/dev/null || true)"
         json="$(extract_block "$raw" "$legacy_marker" "$legacy_end" | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
       fi
     fi
-    if jq empty <<<"$json" >/dev/null 2>&1; then
+    if valid_json "$json"; then
       export_state "$json"
       echo "Loaded durable session memory $(jq -r '.session_id' "$state_file")"
       exit 0
@@ -126,7 +128,7 @@ case "$cmd" in
     ;;
   set)
     json="$(printenv SESSION_JSON || true)"
-    jq empty <<<"$json" >/dev/null 2>&1 || exit 2
+    valid_json "$json" || exit 2
     printf '%s
 ' "$json" > "$state_file"
     write_memory || true

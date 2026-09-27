@@ -15,10 +15,13 @@ session_branch="${OC_SESSION_BRANCH:-}"
 head_sha="${OC_SESSION_HEAD_SHA:-}"
 if [[ -z "$head_sha" && -n "$session_branch" ]]; then head_sha="$(git rev-parse "$session_branch" 2>/dev/null || true)"; fi
 pr_number="${OC_SESSION_PR_NUMBER:-0}"
+[[ "$pr_number" =~ ^[0-9]+$ ]] || pr_number=0
 pr_url="${OC_SESSION_PR_URL:-}"
 comment_id="${OC_ISSUE_LAST_COMMENT_ID:-0}"
+[[ "$comment_id" =~ ^[0-9]+$ ]] || comment_id=0
 run_id="${GITHUB_RUN_ID:-}"
 durable="${OC_DURABLE_WORK:-false}"
+[[ "$durable" == "true" || "$durable" == "false" ]] || durable=false
 attempt="${OC_SESSION_ATTEMPT:-}"
 target_repo="${OC_TARGET_REPO:-}"
 target_base="${OC_TARGET_BASE:-}"

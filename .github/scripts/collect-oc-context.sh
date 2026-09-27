@@ -27,7 +27,7 @@ issue_memory="$(jq -r '.body // ""' "$issue_json" | awk -v a="$memory_marker" -v
   echo
   echo "Source: GitHub issue #$target in $repo"
   echo "Complete issue context is read in bounded batches; do not load the entire file into one prompt."
-  if jq empty <<<"$issue_memory" >/dev/null 2>&1; then
+  if [[ -n "$(printf "%s" "$issue_memory" | tr -d "[:space:]")" ]] && jq -e 'type=="object"' >/dev/null 2>&1 <<<"$issue_memory"; then
     echo
     echo "## Durable /oc memory"
     jq . <<<"$issue_memory"

@@ -96,20 +96,25 @@ context_refs="$(printenv OC_REFERENCE_CONTEXT_FILE 2>/dev/null || true)"
 [ -n "$context_refs" ] || context_refs="$runner_temp/oc-reference-context.md"
 
 capture_final_response() {
-  : > "$final_response_file"
-  local sessions_json session_id export_json answer cwd
-  cwd="$(realpath "$agent_cwd" 2>/dev/null || printf '%s' "$agent_cwd")"
-  sessions_json="$(opencode session list --max-count 100 --format json 2>/dev/null || printf '[]')"
-  session_id="$(jq -r --arg cwd "$cwd" '[.[] | select((.directory // "") == $cwd)] | sort_by(.updated // .created // 0) | last.id // ""' <<<"$sessions_json" 2>/dev/null || true)"
+  if [[ -s "$final_response_file" ]]; then return 0; fi
+  local sessions_file session_id export_file answer_file cwd
+  sessions_file="$runner_temp/opencode-sessions-$attempt.json"
+  opencode session list --max-count 100 --format json >"$sessions_file" 2>/dev/null || printf '[]\n' >"$sessions_file"
+  cwd="$(realpath "$agent_cwd" 2>/dev/null || printf "%s" "$agent_cwd")"
+  session_id="$(jq -r --arg cwd "$cwd" '[.[] | select((.directory // "") == $cwd)] | sort_by(.updated // .created // 0) | last.id // ""' "$sessions_file" 2>/dev/null || true)"
   if [[ -z "$session_id" ]]; then
-    session_id="$(jq -r 'sort_by(.updated // .created // 0) | last.id // ""' <<<"$sessions_json" 2>/dev/null || true)"
+    session_id="$(jq -r 'sort_by(.updated // .created // 0) | last.id // ""' "$sessions_file" 2>/dev/null || true)"
   fi
   [[ -n "$session_id" ]] || return 0
-  export_json="$(opencode session export "$session_id" --sanitize 2>/dev/null || opencode export "$session_id" --sanitize 2>/dev/null || true)"
-  [[ -n "$export_json" ]] || return 0
-  answer="$(jq -r 'if type=="array" then [ .[] | select(.info?.role=="assistant") ] | last | [.parts[]? | select(.type=="text" and ((.synthetic // false)|not) and ((.ignored // false)|not)) | .text] | join("\n\n") elif .messages then [ .messages[] | select(.role=="assistant") ] | last | (.content // .text // "") else empty end' <<<"$export_json" 2>/dev/null || true)"
-  [[ -n "$answer" && "$answer" != "null" ]] || return 0
-  printf '%s\n' "$answer" | sanitize_line > "$final_response_file"
+  export_file="$runner_temp/opencode-export-$attempt.json"
+  rm -f "$export_file"
+  opencode export "$session_id" --sanitize >"$export_file" 2>/dev/null || return 0
+  answer_file="$runner_temp/opencode-answer-$attempt.md"
+  : >"$answer_file"
+  jq -r 'if (.messages|type) == "array" then (.messages | map(select(.info?.role=="assistant")) | last | [.parts[]? | select(.type=="text" and (.text|type=="string")) | .text] | join("\n\n")) elif type=="array" then (map(select(.info?.role=="assistant")) | last | [.parts[]? | select(.type=="text" and (.text|type=="string")) | .text] | join("\n\n")) else empty end' "$export_file" >"$answer_file" 2>/dev/null || true
+  if [[ -s "$answer_file" ]]; then cp "$answer_file" "$final_response_file"; fi
+  rm -f "$sessions_file" "$export_file" "$answer_file"
+  [[ -s "$final_response_file" ]]
 }
 
 agent_cmd=()

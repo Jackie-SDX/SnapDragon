@@ -10,6 +10,7 @@ emit_out(){ printf '%s=%s\n' "$1" "$2" >> "${GITHUB_OUTPUT:-/dev/null}"; }
 
 branch="$(jq -r '.active_branch // ""' "$state_file" 2>/dev/null || true)"
 pr_number="$(jq -r '.active_pr_number // 0' "$state_file" 2>/dev/null || printf 0)"
+[[ "$pr_number" =~ ^[0-9]+$ ]] || pr_number=0
 
 # Backward-compatible rescue for a pre-durable-session OpenCode PR.
 if [[ -z "$branch" ]]; then
