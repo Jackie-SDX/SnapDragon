@@ -72,30 +72,11 @@ fi
 publish_outcome="not-requested"
 pr_url="$(read_back pr_url)"
 publish_rc=0
-if [[ "$clarification_required" == "true" ]]; then
-  publish_outcome="waiting-for-input"
-elif [[ "$task_mode" == "report" ]]; then
-  publish_outcome="report-only"
-elif [[ "$publish_requested" == "true" && ( "$agent_outcome" == "success" || "$durable_work" == "true" ) ]]; then
-  set +e
-  if [[ "$mode" == "remote" ]]; then
-    GH_TOKEN="$controller_gh_token" GITHUB_TOKEN="$controller_gh_token" UNIVERSAL_TOKEN="$controller_universal_token" PUBLISH_REQUESTED="true" bash .github/scripts/publish-remote-opencode.sh
-  else
-    GH_TOKEN="$controller_gh_token" GITHUB_TOKEN="$controller_gh_token" UNIVERSAL_TOKEN="$controller_universal_token" OC_SESSION_BRANCH="$agent_branch" PUBLISH_REQUESTED="true" bash .github/scripts/publish-oc-session.sh
-  fi
-  publish_rc=$?
-  set -e
-  pr_url="$(read_back pr_url)"
-  if [[ "$publish_rc" -eq 0 ]]; then publish_outcome="published"; else publish_outcome="failed"; fi
-elif [[ "$durable_work" == "true" ]]; then
-  publish_outcome="checkpointed"
-fi
 
 result_state="failed"
 [[ "$agent_outcome" == "success" ]] && result_state="completed"
 [[ "$agent_outcome" == "clarification" ]] && result_state="awaiting-input"
 [[ "$durable_work" == "true" && "$agent_outcome" != "success" ]] && result_state="checkpointed"
-[[ "$publish_rc" -ne 0 ]] && result_state="publication-failed"
 
 out agent_outcome "$agent_outcome"
 out clarification_required "$clarification_required"

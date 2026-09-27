@@ -18,12 +18,20 @@ mkdir -p "$runner_temp"
 issue_json="$(mktemp)"
 trap 'rm -f "$issue_json"' EXIT
 gh api "/repos/$repo/issues/$target" > "$issue_json"
+memory_marker="<!-- oc-session-memory:v2 issue:$target -->"
+memory_end="<!-- /oc-session-memory -->"
+issue_memory="$(jq -r '.body // ""' "$issue_json" | awk -v a="$memory_marker" -v b="$memory_end" 'index($0,a){inside=1;next} index($0,b){inside=0;next} inside{print}' | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
 
 {
   echo "# /oc complete issue context"
   echo
   echo "Source: GitHub issue #$target in $repo"
   echo "Complete issue context is read in bounded batches; do not load the entire file into one prompt."
+  if jq empty <<<"$issue_memory" >/dev/null 2>&1; then
+    echo
+    echo "## Durable /oc memory"
+    jq . <<<"$issue_memory"
+  fi
   echo "Read the complete issue context from beginning to end using bounded batches."
   echo
   echo "## Issue"

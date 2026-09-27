@@ -21,7 +21,7 @@ if [[ "$lower" =~ ^continue([[:space:]]|$) ]] &&
   session_required=true
   mode=code
   intent=continue
-  publish_requested=true
+  publish_requested=false
   request="$(printf '%s' "$request" | sed -E 's#^continue[[:space:]]*##')"
   printf '%s\n' "$request" > "$request_file"
 elif [[ "$lower" =~ ^merge([[:space:]]|$) ]]; then

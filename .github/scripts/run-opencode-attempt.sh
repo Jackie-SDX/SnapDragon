@@ -95,6 +95,23 @@ context_refs="$(printenv OC_REFERENCE_CONTEXT_FILE 2>/dev/null || true)"
 [ -n "$context_full" ] || context_full="$runner_temp/oc-issue-context-full.md"
 [ -n "$context_refs" ] || context_refs="$runner_temp/oc-reference-context.md"
 
+capture_final_response() {
+  : > "$final_response_file"
+  local sessions_json session_id export_json answer cwd
+  cwd="$(realpath "$agent_cwd" 2>/dev/null || printf '%s' "$agent_cwd")"
+  sessions_json="$(opencode session list --max-count 100 --format json 2>/dev/null || printf '[]')"
+  session_id="$(jq -r --arg cwd "$cwd" '[.[] | select((.directory // "") == $cwd)] | sort_by(.updated // .created // 0) | last.id // ""' <<<"$sessions_json" 2>/dev/null || true)"
+  if [[ -z "$session_id" ]]; then
+    session_id="$(jq -r 'sort_by(.updated // .created // 0) | last.id // ""' <<<"$sessions_json" 2>/dev/null || true)"
+  fi
+  [[ -n "$session_id" ]] || return 0
+  export_json="$(opencode session export "$session_id" --sanitize 2>/dev/null || opencode export "$session_id" --sanitize 2>/dev/null || true)"
+  [[ -n "$export_json" ]] || return 0
+  answer="$(jq -r 'if type=="array" then [ .[] | select(.info?.role=="assistant") ] | last | [.parts[]? | select(.type=="text" and ((.synthetic // false)|not) and ((.ignored // false)|not)) | .text] | join("\n\n") elif .messages then [ .messages[] | select(.role=="assistant") ] | last | (.content // .text // "") else empty end' <<<"$export_json" 2>/dev/null || true)"
+  [[ -n "$answer" && "$answer" != "null" ]] || return 0
+  printf '%s\n' "$answer" | sanitize_line > "$final_response_file"
+}
+
 agent_cmd=()
 if [[ "${OC_TARGET_MODE:-local}" == "remote" ]]; then
   ws="${OC_TARGET_WORKSPACE:-}"
@@ -335,6 +352,7 @@ set -e
 
 elapsed=$(( $(date +%s) - start_epoch ))
 termination_reason="completed"
+capture_final_response || true
 provider_warning="false"
 case "$exit_code" in
   124) termination_reason="timeout" ;;

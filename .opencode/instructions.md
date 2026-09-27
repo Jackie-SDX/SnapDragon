@@ -68,3 +68,13 @@ Resolve ambiguity from the repository, available tools, APIs, documentation, and
 ## Final response
 
 Report what was actually done, important evidence, files/commits/artifacts/links when relevant, and any remaining blocker. Do not substitute a long explanation for execution.
+
+
+## Context and memory
+
+Treat context as layered state:
+- current user request + chronological issue/PR conversation = intent;
+- compact durable /oc memory = goal, completed, remaining, tests/evidence, warnings, next action, target repo/branch/HEAD;
+- Git history, current branch/HEAD, working tree/diff, and CI = execution truth.
+
+Every fresh runner must reread repository instructions, durable memory, current issue/PR history, and current Git state. Runner-local session data is cache only. Keep durable memory compact and factual; never turn it into a transcript. When context grows large, checkpoint and continue from the compact state rather than ending early.
