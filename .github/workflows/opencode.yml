@@ -265,13 +265,16 @@ jobs:
           DW1: ${{ steps.attempt_1.outputs.durable_work }}
           CL1: ${{ steps.attempt_1.outputs.clarification_required }}
           A1: ${{ steps.attempt_1.outputs.agent_outcome }}
+          RESULT_PUBLISHED: ${{ env.OC_RESULT_PUBLISHED || 'false' }}
+          FINAL_RESPONSE_CAPTURED: ${{ env.OC_FINAL_RESPONSE_CAPTURED || 'false' }}
         run: |
           durable=false
           [[ "$DW1" == "true" ]] && durable=true
           phase=blocked; status=active; next="inspect the durable branch and continue"
           [[ "$CL1" == "true" ]] && phase=waiting_for_clarification && status=waiting && next="answer the clarification request, then resume with /oc continue"
-          [[ "$CL1" != "true" && "$durable" == "true" ]] && phase=checkpointed && next="resume with /oc continue"
-          [[ "$CL1" != "true" && "$A1" == "success" ]] && phase=completed && status=complete && next="await user direction"
+          [[ "$CL1" != "true" ]] && [[ "$A1" == "success" && "$RESULT_PUBLISHED" == "true" && "$FINAL_RESPONSE_CAPTURED" == "true" ]] && phase=completed && status=complete && next="await user direction"
+          [[ "$CL1" != "true" ]] && [[ "$A1" == "success" && ( "$RESULT_PUBLISHED" != "true" || "$FINAL_RESPONSE_CAPTURED" != "true" ) ]] && phase=blocked && status=active && next="repair the final response handoff, then resume with /oc continue"
+          [[ "$CL1" != "true" ]] && [[ "$A1" != "success" && "$durable" == "true" ]] && phase=checkpointed && next="resume with /oc continue"
           OC_DURABLE_WORK="$durable" OC_SESSION_PHASE="$phase" OC_SESSION_STATUS="$status" OC_SESSION_NEXT_ACTION="$next" bash .github/scripts/record-oc-session-progress.sh || true
 
       - name: Final status
