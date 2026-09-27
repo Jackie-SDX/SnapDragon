@@ -122,7 +122,6 @@ $run_url
 
 On resume, recover this exact target repository/branch/HEAD and durable session state first. Do not restart the task from scratch, create duplicate work, or discard partial changes/evidence.
 EOF
-)"EOF
 )"
 
 gh issue comment "$target" --body "$body"
