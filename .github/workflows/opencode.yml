@@ -217,14 +217,6 @@ jobs:
           mode: ${{ steps.target.outputs.mode }}
           task_mode: ${{ env.OC_TASK_MODE }}
 
-      - name: Reconcile OpenCode publication
-        if: always() && env.OC_PUBLISH_REQUESTED == 'true' && env.OC_TASK_MODE != 'report' && steps.target.outputs.mode != 'remote' && steps.attempt_1.outputs.agent_outcome == 'success' && steps.attempt_1.outputs.publish_outcome != 'failed'
-        env:
-          GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
-          BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
-        shell: bash
-        run: bash .github/scripts/reconcile-opencode-result.sh
-
       - name: Post controlled timeout continuation
         if: always() && (steps.attempt_1.outputs.termination_reason == 'timeout' || steps.attempt_1.outputs.timed_out == 'true')
         continue-on-error: true
@@ -240,22 +232,6 @@ jobs:
           OPENCODE_AGENT_TIMEOUT_MINUTES: "330"
         shell: bash
         run: bash .github/scripts/post-oc-continuation.sh
-
-      - name: Autonomous CI recovery loop
-        if: always() && env.OC_PUBLISH_REQUESTED == 'true' && env.OC_TASK_MODE != 'report' && steps.attempt_1.outputs.agent_outcome == 'success'
-        env:
-          GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
-          TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
-          BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
-          OC_RUN_START_ISO: ${{ env.OC_RUN_START_ISO }}
-          OC_JOB_START_EPOCH: ${{ env.OC_JOB_START_EPOCH }}
-          OC_JOB_BUDGET_SECONDS: "21600"
-          OC_JOB_SAFETY_MARGIN_SECONDS: "1800"
-          OC_ISSUE_CONTEXT_FILE: ${{ env.OC_ISSUE_CONTEXT_FILE }}
-          OC_CI_WATCH_MINUTES: "45"
-          OC_CI_WATCH_POLL_SECONDS: "20"
-        shell: bash
-        run: bash .github/scripts/recover-opencode-ci.sh
 
       - name: Post concise /oc result
         if: always()
@@ -295,7 +271,7 @@ jobs:
           if [[ "$MERGE_REQUESTED" == "true" ]]; then [[ "$MERGE_EXIT" == "0" ]] && success=true; fi
           if [[ "$CL1" == "true" ]]; then success=true; fi
           if [[ "$TASK_MODE" == "report" && "$A1" == "success" ]]; then success=true; fi
-          if [[ "$TASK_MODE" != "report" && "$A1" == "success" && "$P1" != "failed" ]]; then success=true; fi
+          if [[ "$A1" == "success" ]]; then success=true; fi
           if [[ "$DW1" == "true" ]]; then success=true; fi
           if [[ "$success" == "true" ]]; then
             if [[ "$CL1" == "true" ]]; then
@@ -326,54 +302,6 @@ jobs:
           [[ "$CL1" != "true" && "$durable" == "true" ]] && phase=checkpointed && next="resume with /oc continue"
           [[ "$CL1" != "true" && "$A1" == "success" ]] && phase=completed && status=complete && next="await user direction"
           OC_DURABLE_WORK="$durable" OC_SESSION_PHASE="$phase" OC_SESSION_STATUS="$status" OC_SESSION_NEXT_ACTION="$next" bash .github/scripts/record-oc-session-progress.sh || true
-
-      - name: Record /oc run observability record
-        if: always()
-        continue-on-error: true
-        shell: bash
-        env:
-          OC_OBS_RUN_ID: ${{ github.run_id }}
-          OC_OBS_ISSUE: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
-          OC_OBS_MODE: ${{ steps.target.outputs.mode }}
-          OC_OBS_TASK_MODE: ${{ env.OC_TASK_MODE }}
-          OC_OBS_VERSION: ${{ steps.opencode_release.outputs.version }}
-          OC_OBS_INITIAL_SHA: ${{ steps.initial_state.outputs.sha }}
-          OC_OBS_TARGET_REPO: ${{ steps.target.outputs.target_repo }}
-          OC_OBS_TARGET_BASE: ${{ steps.target.outputs.target_base }}
-          OC_OBS_TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
-          OC_OBS_R1: primary
-          OC_OBS_R1_PROVIDER: opencode
-          OC_OBS_A1: ${{ steps.attempt_1.outputs.agent_outcome }}
-          OC_OBS_PU1: ${{ steps.attempt_1.outputs.publish_outcome }}
-          OC_OBS_V1: ${{ steps.attempt_1.outputs.verified }}
-          OC_OBS_VERIFIED_SHA: ${{ steps.attempt_1.outputs.verified_sha }}
-          OC_OBS_PR_URL: ${{ steps.attempt_1.outputs.pr_url }}
-          OC_OBS_CI_RUN_ID: ${{ steps.attempt_1.outputs.ci_run_id }}
-          OC_OBS_CI_SURFACES: ${{ steps.attempt_1.outputs.ci_surfaces }}
-        run: bash .github/scripts/write-oc-run-record.sh
-
-      - name: Upload /oc session context artifact
-        if: always() && env.OC_SESSION_REQUIRED == 'true'
-        continue-on-error: true
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1
-        with:
-          name: oc-session-context-${{ github.run_id }}
-          path: |
-            ${{ env.OC_SESSION_STATE_FILE }}
-            ${{ env.OC_ISSUE_CONTEXT_SEED_FILE }}
-            ${{ env.OC_ISSUE_CONTEXT_INDEX_FILE }}
-            ${{ env.OC_REFERENCE_CONTEXT_FILE }}
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: Upload /oc run record artifact
-        if: always()
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1
-        with:
-          name: oc-run-record-${{ github.run_id }}
-          path: docs/oc-runs/${{ github.run_id }}.json
-          if-no-files-found: ignore
-          retention-days: 365
 
       - name: Clean up remote target workspace
         if: always()
