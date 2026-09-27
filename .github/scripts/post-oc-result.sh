@@ -83,14 +83,7 @@ elif [[ "${CL1:-false}" == "true" ]]; then
   bash .github/scripts/record-oc-session-progress.sh >/dev/null 2>&1 || true
 fi
 
-body="$body"if [[ -n "${GH_COMMENT_FILE:-}" ]]; then
-  # Deterministic test seam used by controller contract tests; production keeps
-  # the API-based publisher unchanged.
-  gh issue comment "$target" --body "$body" >/dev/null
-else
-  gh api -X POST -f body="$body" "/repos/$repo/issues/$target/comments" >/dev/null
-fi
-\n'"$result_marker"
+body="$body"$'\n'"$result_marker"
 if [[ -n "${GH_COMMENT_FILE:-}" ]]; then
   # Deterministic test seam used by controller contract tests; production keeps
   # the API-based publisher unchanged.
