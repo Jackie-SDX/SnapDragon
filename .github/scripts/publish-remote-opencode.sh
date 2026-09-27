@@ -32,6 +32,16 @@ if [[ ! -d "$ws/.git" ]]; then
   exit 1
 fi
 
+git -C "$ws" fetch -q origin "$base" >/dev/null 2>&1 || true
+base_sha="$(git -C "$ws" rev-parse "origin/$base" 2>/dev/null || true)"
+head_sha_before="$(git -C "$ws" rev-parse HEAD 2>/dev/null || true)"
+tree_dirty="false"
+[[ -n "$(git -C "$ws" status --short 2>/dev/null || true)" ]] && tree_dirty="true"
+branch_ahead="false"
+if [[ "$base_sha" =~ ^[0-9a-f]{40}$ && "$head_sha_before" =~ ^[0-9a-f]{40}$ && "$head_sha_before" != "$base_sha" ]]; then
+  branch_ahead="true"
+fi
+
 title="$(jq -r '.issue.title // .pull_request.title // "OpenCode remote-target task"' "$GITHUB_EVENT_PATH" 2>/dev/null | tr '\n' ' ' | cut -c1-72)"
 [[ -n "$title" ]] || title="OpenCode remote-target task"
 
@@ -39,7 +49,7 @@ title="$(jq -r '.issue.title // .pull_request.title // "OpenCode remote-target t
 # controller policy that was installed for the run. The target keeps its
 # repository exactly as it is apart from the agent's change.
 
-if [[ -z "$(git -C "$ws" status --short)" ]]; then
+if [[ "$tree_dirty" != "true" && "$branch_ahead" != "true" ]]; then
   echo "Remote target workspace has no changes after this run."
   existing_json="$(gh pr list --repo "$repo" --head "$branch" --base "$base" --state open --limit 10 --json number,url,headRefOid 2>/dev/null || printf '%s' '[]')"
   existing="$(jq -r '.[0].url // ""' <<<"$existing_json" 2>/dev/null || true)"
