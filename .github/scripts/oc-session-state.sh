@@ -3,7 +3,8 @@ set -euo pipefail
 
 repo="$(printenv GITHUB_REPOSITORY || true)"
 target="$(printenv TARGET_NUMBER || printf 0)"
-cmd="$(printenv OC_SESSION_CMD || printf load)"
+cmd="$1"
+[[ -n "$cmd" ]] || cmd=load
 runner_temp="$(printenv RUNNER_TEMP || printf /tmp)"
 state_file="$(printenv OC_SESSION_STATE_FILE || printf '%s/oc-session-state.json' "$runner_temp")"
 memory_marker="<!-- oc-session-memory:v2 issue:$target -->"
