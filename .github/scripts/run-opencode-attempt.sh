@@ -29,7 +29,15 @@ command -v mkfifo >/dev/null 2>&1 || {
 }
 
 runner_temp="${RUNNER_TEMP:-/tmp}"
-activity_guidance='Research mode: keep OpenCode thinking blocks enabled and visible in the live Actions log. Do not replace the thinking stream with summary-only markers. Continue to redact credentials, API keys, tokens, and other secrets from streamed output.
+activity_guidance='Start with the exact user request. The request is the first source of truth. Do not automatically inspect the repository, issue history, CI, or durable memory merely because an /oc session exists. For simple conversational/read-only requests, answer directly. When the request is a code task, continuation, diagnosis, release, CI investigation, or otherwise needs historical/state context, decide what context is actually relevant and retrieve it on demand.
+
+On-demand context is available without being preloaded:
+- durable memory: $OC_SESSION_STATE_FILE
+- bulk issue/PR/history/CI collector: ${OC_CONTEXT_COLLECTOR:-.github/scripts/collect-oc-context.sh}
+- generated context files: $RUNNER_TEMP/oc-issue-context-seed.md and $RUNNER_TEMP/oc-issue-context-full.md
+Use the collector only when it materially helps the current request. The controller must not decide the agent needs all context up front.
+
+Research mode: keep OpenCode thinking blocks enabled and visible in the live Actions log. Do not replace the thinking stream with summary-only markers. Continue to redact credentials, API keys, tokens, and other secrets from streamed output.
 
 Autonomous self-modification: you may modify workflows, shell scripts, controller code, prompts, configuration, and other execution-critical files when requested. Before changing one, identify the currently running step/process, the checkout/worktree it uses, and later dependencies. Do not assume a running process reloads edited files; preserve the active control plane and validate the new behavior from a fresh process, job, or workflow when needed. Prefer isolated worktrees/branches and coherent checkpoints for risky changes. Inspect references before deleting/renaming execution-critical files, and preserve recovery, publication, redaction, session-state, and CI-observation paths unless the task explicitly changes them. This is engineering judgment, not a hard restriction.
 
@@ -166,14 +174,221 @@ fi
     model_name="${MODEL:-opencode/mimo-v2.6-flash-free}"
     task_prompt="${request:-}"
     if [[ -z "$task_prompt" || "$task_prompt" == "run" ]]; then
-      task_prompt="Execute the latest user request in the attached issue context. Treat the issue body and chronological comments as the task source of truth. Answer the user directly; do not modify, commit, publish, or merge repository files unless the request explicitly requires a repository change."
+      task_prompt="Execute the user's latest request directly. Start from the request itself. Do not assume repository inspection, issue-history retrieval, durable-memory loading, or CI inspection is necessary. Decide whether additional context is actually needed for this request; retrieve it only when it materially helps answer or execute the request."
     fi
-    task_prompt="$task_prompt"$'\n\n'"$activity_guidance"
+    task_prompt="$task_prompt"  fi
+
+  sanitize_line() {
+  local line="$1" secret
+  for secret in \
+    "${COMPOSIO_API_KEY:-}" \
+    "${OPENCODE_API_KEY:-}" \
+    "${GITHUB_TOKEN:-}" \
+    "${GH_TOKEN:-}" \
+    "${UNIVERSAL_TOKEN:-}" \
+    "${GITHUB_TOKEN:-}" \
+    "${GH_TOKEN:-}" \
+    "${UNIVERSAL_TOKEN:-}"; do
+    if [[ -n "$secret" ]]; then
+      line="${line//$secret/[REDACTED]}"
+    fi
+  done
+  printf "%s" "$line" |
+    sed -E \
+      -e "s/(AIza[[:alnum:]_-]{20,})/[REDACTED_GOOGLE_KEY]/g" \
+      -e "s/(gh[ps]_[[:alnum:]_]{20,}|github_pat_[[:alnum:]_]{20,})/[REDACTED_GITHUB_TOKEN]/g" \
+      -e "s/(sk-or-v1-[[:alnum:]_-]{20,})/[REDACTED_EXTERNAL_API_KEY]/g" \
+      -e "s/(Bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/g"
+}
+
+configured_timeout_seconds=$((agent_timeout_minutes * 60))
+effective_timeout_seconds="$configured_timeout_seconds"
+job_budget_seconds="${OC_JOB_BUDGET_SECONDS:-${OC_CONTROL_PLANE_JOB_BUDGET_SECONDS:-}}"
+job_safety_seconds="${OC_JOB_SAFETY_MARGIN_SECONDS:-${OC_CONTROL_PLANE_JOB_SAFETY_MARGIN_SECONDS:-120}}"
+job_start_epoch="${OC_JOB_START_EPOCH:-}"
+
+if [[ -n "$job_budget_seconds" && "$job_budget_seconds" =~ ^[0-9]+$ &&
+      "$job_safety_seconds" =~ ^[0-9]+$ && "$job_start_epoch" =~ ^[0-9]+$ ]]; then
+  now_epoch="$(date +%s)"
+  elapsed=$((now_epoch - job_start_epoch))
+  remaining=$((job_budget_seconds - elapsed - job_safety_seconds))
+  if (( remaining < effective_timeout_seconds )); then
+    effective_timeout_seconds="$remaining"
+  fi
+fi
+
+{
+  printf "effective_timeout_seconds=%s\n" "$effective_timeout_seconds"
+  printf "progress_log_path=%s\n" "$progress_log"
+  printf "safe_log_path=%s\n" "$safe_log"
+} >> "$output_file"
+
+if [[ "$task_mode" == "code" ]]; then
+  if [[ -n "$job_budget_seconds" && "$job_budget_seconds" =~ ^[0-9]+$ &&
+        "$job_safety_seconds" =~ ^[0-9]+$ && "$job_start_epoch" =~ ^[0-9]+$ ]]; then
+    now_epoch="$(date +%s)"
+    elapsed=$((now_epoch - job_start_epoch))
+    remaining=$((job_budget_seconds - elapsed - job_safety_seconds))
+    if (( remaining < effective_timeout_seconds )); then
+      effective_timeout_seconds="$remaining"
+    fi
+  fi
+fi
+
+if (( effective_timeout_seconds < 1 )); then
+  printf "termination_reason=timeout\nexit_code=124\n" >> "$output_file"
+  echo "::warning title=OpenCode attempt budget exhausted::No remaining job budget is available for attempt ${attempt}."
+  exit 124
+fi
+
+heartbeat_interval="${OC_PROGRESS_INTERVAL_SECONDS:-${OC_CONTROL_PLANE_PROGRESS_INTERVAL_SECONDS:-30}}"
+if [[ ! "$heartbeat_interval" =~ ^[0-9]+$ ]] || (( heartbeat_interval < 1 )); then
+  heartbeat_interval=30
+fi
+
+start_epoch="$(date +%s)"
+printf "[OC][attempt=%s][elapsed=0s] started route=%s\n" "$attempt" "${MODEL:-github}" >> "$progress_log"
+echo "[OC][attempt=${attempt}][elapsed=0s] started route=${MODEL:-github}"
+mkfifo "$fifo"
+
+checkpoint_session_state() {
+  local elapsed="$1"
+  local branch="" head="" dirty="false" durable="false" target_note="" base_head=""
+  if [[ "${OC_TARGET_MODE:-local}" == "remote" && -n "${OC_TARGET_WORKSPACE:-}" && -d "${OC_TARGET_WORKSPACE:-}" ]]; then
+    branch="$(git -C "$OC_TARGET_WORKSPACE" branch --show-current 2>/dev/null || true)"
+    head="$(git -C "$OC_TARGET_WORKSPACE" rev-parse HEAD 2>/dev/null || true)"
+    [[ -n "$(git -C "$OC_TARGET_WORKSPACE" status --porcelain 2>/dev/null || true)" ]] && dirty="true"
+    base_head="$(git -C "$OC_TARGET_WORKSPACE" rev-parse "origin/${OC_TARGET_BASE:-main}" 2>/dev/null || true)"
+    if [[ "$head" =~ ^[0-9a-f]{40}$ && "$base_head" =~ ^[0-9a-f]{40}$ && "$head" != "$base_head" ]]; then durable="true"; fi
+    [[ "$dirty" == "true" ]] && durable="true"
+    target_note="target=${OC_TARGET_REPO:-unknown}@${branch:-unknown} head=${head:-unknown} dirty=${dirty}"
+  elif [[ -n "$agent_worktree" && -d "$agent_worktree" ]]; then
+    branch="$(git -C "$agent_worktree" branch --show-current 2>/dev/null || true)"
+    head="$(git -C "$agent_worktree" rev-parse HEAD 2>/dev/null || true)"
+    [[ -n "$(git -C "$agent_worktree" status --porcelain 2>/dev/null || true)" ]] && durable="true"
+    target_note="controller-branch=${branch:-detached} head=${head:-unknown} dirty=${durable}"
+  else
+    target_note="workspace not available for checkpoint"
+  fi
+  if [[ -n "${OC_SESSION_STATE_FILE:-}" ]]; then
+    OC_SESSION_PHASE="working" \
+    OC_SESSION_STATUS="active" \
+    OC_SESSION_MILESTONE="heartbeat_checkpoint" \
+    OC_SESSION_NEXT_ACTION="continue current task from the durable target branch; inspect existing work and CI" \
+    OC_SESSION_EVIDENCE="elapsed=${elapsed}s; ${target_note}" \
+    OC_SESSION_BRANCH="$branch" \
+    OC_SESSION_HEAD_SHA="$head" \
+    OC_SESSION_ATTEMPT="$attempt" \
+    OC_DURABLE_WORK="$durable" \
+    bash "$controller_root/.github/scripts/record-oc-session-progress.sh" || true
+  fi
+}
+
+heartbeat() {
+  local elapsed next_checkpoint=300
+  while kill -0 "$agent_pid" 2>/dev/null; do
+    sleep "$heartbeat_interval"
+    kill -0 "$agent_pid" 2>/dev/null || break
+    elapsed=$(( $(date +%s) - start_epoch ))
+    printf "[OC][attempt=%s][elapsed=%ss] heartbeat state=running\n" "$attempt" "$elapsed" >> "$progress_log"
+    if (( elapsed >= next_checkpoint )); then
+      checkpoint_worktree
+      checkpoint_session_state "$elapsed"
+      next_checkpoint=$((elapsed + 300))
+    fi
+  done
+}
+
+set +e
+if [[ -n "$agent_cwd" ]]; then
+  pushd "$agent_cwd" >/dev/null || {
+    echo "::error title=Agent worktree entry failed::Could not enter $agent_cwd." >&2
+    exit 2
+  }
+  printf "[OC][LIVE] OpenCode session started; streaming safe activity summaries and tool actions.\n" | tee -a "$progress_log"
+  timeout --signal=TERM --kill-after=60s "${effective_timeout_seconds}s" "${agent_cmd[@]}" < <(printf "%s
+" "$task_prompt") >"$fifo" 2>&1 &
+  agent_pid=$!
+  popd >/dev/null
+else
+  printf "[OC][LIVE] OpenCode session started; streaming safe activity summaries and tool actions.\n" | tee -a "$progress_log"
+  timeout --signal=TERM --kill-after=60s "${effective_timeout_seconds}s" "${agent_cmd[@]}" >"$fifo" 2>&1 &
+  agent_pid=$!
+fi
+heartbeat &
+heartbeat_pid=$!
+
+while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+  safe_line="$(sanitize_line "$raw_line")"
+  printf "%s\n" "$safe_line"
+done < "$fifo" | awk -f "$script_dir/filter-opencode-live-output.awk" | tee -a "$safe_log"
+wait "$agent_pid"
+exit_code=$?
+
+if [[ "$task_mode" == "code" && -n "$agent_cwd" ]]; then
+  checkpoint_worktree
+fi
+
+agent_branch=""
+session_head_sha=""
+remote_dirty="false"
+remote_base_sha=""
+if [[ "${OC_TARGET_MODE:-local}" == "remote" && -n "${OC_TARGET_WORKSPACE:-}" && -d "${OC_TARGET_WORKSPACE:-}" ]]; then
+  agent_branch="${OC_TARGET_BRANCH:-$(git -C "$OC_TARGET_WORKSPACE" branch --show-current 2>/dev/null || true)}"
+  session_head_sha="$(git -C "$OC_TARGET_WORKSPACE" rev-parse HEAD 2>/dev/null || true)"
+  remote_base_sha="$(git -C "$OC_TARGET_WORKSPACE" rev-parse "origin/${OC_TARGET_BASE:-main}" 2>/dev/null || true)"
+  [[ -n "$(git -C "$OC_TARGET_WORKSPACE" status --porcelain 2>/dev/null || true)" ]] && remote_dirty="true"
+elif [[ -n "$agent_worktree" && -e "$agent_worktree/.git" ]]; then
+  agent_branch="$(git -C "$agent_worktree" branch --show-current 2>/dev/null || true)"
+  session_head_sha="$(git -C "$agent_worktree" rev-parse HEAD 2>/dev/null || true)"
+fi
+printf "agent_branch=%s\n" "$agent_branch" >> "$output_file"
+
+clarification_required="false"
+clarification_source="$runner_temp/oc-clarification.md"
+rm -f "$clarification_source"
+for candidate in   "$agent_cwd/.opencode/NEEDS_CLARIFICATION.md"   "$agent_cwd/.opencode/needs-clarification.md"   "$agent_worktree/.opencode/NEEDS_CLARIFICATION.md"   "$agent_worktree/.opencode/needs-clarification.md"; do
+  if [ -s "$candidate" ]; then
+    cp "$candidate" "$clarification_source"
+    clarification_required="true"
+    break
+  fi
+done
+printf "clarification_required=%s\n" "$clarification_required" >> "$output_file"
+set -e
+
+elapsed=$(( $(date +%s) - start_epoch ))
+termination_reason="completed"
+capture_final_response || true
+provider_warning="false"
+case "$exit_code" in
+  124) termination_reason="timeout" ;;
+
+  125|126|127) termination_reason="failed" ;;
+  128|129|130|131|132|133|134|135|136|137|138|139|140|141|142|143|144|145|146|147|148|149|150|151|152|153|154|155|156|157|158|159) termination_reason="signal" ;;
+  0) termination_reason="completed" ;;
+  *) termination_reason="failed" ;;
+esac
+if [ "$clarification_required" = "true" ]; then
+  termination_reason="clarification"
+fi
+
+printf "[OC][attempt=%s][elapsed=%ss] finished exit_code=%s termination_reason=%s\n" "$attempt" "$elapsed" "$exit_code" "$termination_reason" | tee -a "$progress_log"
+
+printf "[OC][LIVE] OpenCode session finished; final result is being reconciled.\n" | tee -a "$progress_log"
+{
+  printf "exit_code=%s\n" "$exit_code"
+  printf "termination_reason=%s\n" "$termination_reason"
+  printf "provider_warning=%s\n" "$provider_warning"
+} >> "$output_file"
+
+echo "[OC][attempt=${attempt}] live stream complete; exit_code=${exit_code}; termination_reason=${termination_reason}"
+if [ "$clarification_required" = "true" ]; then exit 0; fi
+exit "$exit_code"
+\n\n'"$activity_guidance"
     agent_cmd=(opencode run --thinking --dir "$agent_cwd" --model "$model_name")
     [[ -n "${VARIANT:-}" ]] && agent_cmd+=(--variant "$VARIANT")
     agent_cmd+=(--agent build --title "oc local ${TARGET_NUMBER:-issue}")
-    [[ -f "$context_seed" ]] && agent_cmd+=(--file "$context_seed")
-    [[ -s "$context_refs" ]] && agent_cmd+=(--file "$context_refs")
   fi
 
   sanitize_line() {
