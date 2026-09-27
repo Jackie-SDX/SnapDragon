@@ -61,7 +61,7 @@ else
   response_file="$runner_temp/opencode-final-response-1.md"
   answer=""
   a1="$(printenv A1 || true)"
-  if [[ "$a1" == "success" && -s "$response_file" ]]; then
+  if [[ -s "$response_file" ]]; then
     answer="$(sanitize_response "$response_file")"
   fi
   if [[ -n "$answer" ]]; then
