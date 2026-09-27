@@ -61,7 +61,7 @@ if [[ "$termination_reason" == "timeout" || "$durable_work" == "true" ]]; then
   OC_SESSION_STATUS="active" \
   OC_SESSION_MILESTONE="budget_or_progress_checkpoint" \
   OC_SESSION_NEXT_ACTION="resume with /oc continue; recover the durable target branch, inspect current work and CI, and continue without repeating completed work" \
-  OC_SESSION_EVIDENCE="attempt=$attempt; termination=$termination_reason; target=${OC_TARGET_REPO:-local}; branch=${agent_branch:-unknown}; head=${session_head_sha:-unknown}; dirty=${remote_dirty:-unknown}; durable_work=$durable_work" \
+  OC_SESSION_EVIDENCE="attempt=$attempt; termination=$termination_reason; target=${OC_TARGET_REPO:-local}; branch=${agent_branch:-unknown}; head=${session_head_sha:-unknown}; dirty=${remote_dirty:-unknown}; durable_work=$durable_work; context_degraded=${OC_CONTEXT_DEGRADED:-false}; ci_runs=${OC_CONTEXT_CI_RUN_IDS:-none}" \
   OC_SESSION_BRANCH="$agent_branch" \
   OC_SESSION_HEAD_SHA="$session_head_sha" \
   OC_SESSION_ATTEMPT="$attempt" \
