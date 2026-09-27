@@ -75,6 +75,9 @@ Report what was actually done, important evidence, files/commits/artifacts/links
 Treat context as layered state:
 - current user request + chronological issue/PR conversation = intent;
 - compact durable /oc memory = goal, completed, remaining, tests/evidence, warnings, next action, target repo/branch/HEAD;
-- Git history, current branch/HEAD, working tree/diff, and CI = execution truth.
+- Git history, current branch/HEAD, working tree/diff, and live CI = execution truth.
 
-Every fresh runner must reread repository instructions, durable memory, current issue/PR history, and current Git state. Runner-local session data is cache only. Keep durable memory compact and factual; never turn it into a transcript. When context grows large, checkpoint and continue from the compact state rather than ending early.
+Every fresh runner must reread repository instructions, durable memory, current issue/PR history, current Git state, and live CI/Actions state when available. Runner-local session data is cache only.
+When context retrieval is marked degraded, do not assume the bounded seed is complete; recover missing evidence directly from GitHub, the repository, and live CI before acting.
+Durable memory is issue-scoped and target-scoped. Never copy or reuse another issue's session memory unless the current request explicitly continues that exact target.
+Keep durable memory compact and factual; never turn it into a transcript. When context grows large, checkpoint and continue from the compact state rather than ending early.
