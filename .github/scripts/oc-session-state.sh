@@ -21,7 +21,7 @@ emit_env(){ printf '%s=%s
 emit_out(){ printf '%s=%s
 ' "$1" "$2" >> "$out_file"; }
 
-issue_body(){ gh api "/repos/$repo/issues/$target" --jq '.body // ""' 2>/dev/null || true; }
+issue_body(){ gh api "/repos/$repo/issues/$target" --jq '.body // ""' 2>/dev/null; }
 
 extract_block(){
   local body="$1" begin="$2" end="$3"
@@ -44,9 +44,9 @@ remove_legacy_comment(){
 }
 
 write_memory(){
-  local json existing stripped body
+  local json existing stripped body verify_body verify_json expected_sid expected_revision
   json="$(cat "$state_file")"
-  existing="$(issue_body)"
+  existing="$(issue_body)" || return 1
   stripped="$(awk -v a="$memory_marker" -v b="$memory_end" '
     index($0,a){inside=1;next}
     index($0,b){inside=0;next}
@@ -59,7 +59,13 @@ STATE-BEGIN
 %s
 STATE-END
 %s' "$stripped" "$memory_marker" "$json" "$memory_end")"
-  gh api -X PATCH -f body="$body" "/repos/$repo/issues/$target" >/dev/null
+  gh api -X PATCH -f body="$body" "/repos/$repo/issues/$target" >/dev/null || return 1
+  verify_body="$(issue_body)" || return 1
+  verify_json="$(extract_block "$verify_body" "$memory_marker" "$memory_end" | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
+  valid_json "$verify_json" || return 1
+  expected_sid="$(jq -r '.session_id // ""' "$state_file")"
+  expected_revision="$(jq -r '.state_revision // 0' "$state_file")"
+  jq -e --arg sid "$expected_sid" --argjson rev "$expected_revision" '.session_id == $sid and (.state_revision // 0) == $rev' >/dev/null 2>&1 <<<"$verify_json" || return 1
   remove_legacy_comment
 }
 
@@ -90,19 +96,41 @@ valid_json() { [[ -n "$(printf "%s" "$1" | tr -d "[:space:]")" ]] && jq -e 'type
 
 case "$cmd" in
   load)
-    body="$(issue_body)"
+    body="$(issue_body || true)"
     json="$(extract_block "$body" "$memory_marker" "$memory_end" | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
-    if ! valid_json "$json"; then
-      id="$(legacy_comment_id || true)"
-      if [[ "$id" =~ ^[0-9]+$ ]]; then
-        raw="$(gh api "/repos/$repo/issues/comments/$id" --jq '.body // ""' 2>/dev/null || true)"
-        json="$(extract_block "$raw" "$legacy_marker" "$legacy_end" | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
+    expected_target="${OC_TARGET_REPO:-}"
+
+    validate_candidate() {
+      local candidate="$1" stored_target
+      valid_json "$candidate" || return 1
+      jq -e --arg repo "$repo" --argjson issue "$target" '(.repository // "") == $repo and (.issue // -1) == $issue' >/dev/null 2>&1 <<<"$candidate" || return 1
+      stored_target="$(jq -r '.target_repository // ""' <<<"$candidate" 2>/dev/null || true)"
+      if [[ -n "$expected_target" || -n "$stored_target" ]] && [[ "$expected_target" != "$stored_target" ]]; then
+        echo "::warning title=Session scope mismatch::Ignoring durable memory for ${stored_target:-local} because this request targets ${expected_target:-local}."
+        return 1
       fi
-    fi
-    if valid_json "$json"; then
+      return 0
+    }
+
+    if validate_candidate "$json"; then
       export_state "$json"
+      emit_env OC_SESSION_MEMORY_PERSISTED true
       echo "Loaded durable session memory $(jq -r '.session_id' "$state_file")"
       exit 0
+    fi
+
+    id="$(legacy_comment_id || true)"
+    if [[ "$id" =~ ^[0-9]+$ ]]; then
+      raw="$(gh api "/repos/$repo/issues/comments/$id" --jq '.body // ""' 2>/dev/null || true)"
+      legacy_json="$(extract_block "$raw" "$legacy_marker" "$legacy_end" | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
+      if validate_candidate "$legacy_json"; then
+        printf '%s\n' "$legacy_json" > "$state_file"
+        export_state "$legacy_json"
+        emit_env OC_SESSION_MEMORY_PERSISTED false
+        remove_legacy_comment || true
+        echo "Loaded legacy session memory $(jq -r '.session_id' "$state_file")"
+        exit 0
+      fi
     fi
     now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     base="$(printenv BASE_REF || printf main)"
@@ -113,9 +141,12 @@ case "$cmd" in
       capabilities:{push:false,target:""},last_verified_sha:"",last_verified_evidence:"",
       created_at:$now,updated_at:$now,last_processed_comment_id:0,current_request:"",
       completed_steps:[],remaining_steps:[],tests_run:[],ci_runs:[],research_sources:[],
-      warnings:[],artifacts:[],next_action:"classify request"
+      warnings:[],artifacts:[],next_action:"classify request",
+      durable_work:false,target_repository:"",target_base:$base,target_branch:"",
+      last_run_id:null,agent_attempt:null,termination_reason:null,last_checkpoint_at:$now
     }')"
     export_state "$json"
+    emit_env OC_SESSION_MEMORY_PERSISTED false
     ;;
   save|checkpoint)
     [[ -f "$state_file" ]] || exit 0
@@ -123,16 +154,28 @@ case "$cmd" in
       echo "::warning title=Session memory blocked::Potential credential material detected."
       exit 0
     fi
-    write_memory || echo "::warning title=Session memory degraded::Issue body memory could not be updated; Git remains authoritative."
+    memory_persisted=true
+    if ! write_memory; then
+      memory_persisted=false
+      echo "::warning title=Session memory degraded::Issue-body memory could not be verified; Git, issue comments, and live CI context remain the recovery sources."
+    fi
     export_state "$(cat "$state_file")"
+    emit_env OC_SESSION_MEMORY_PERSISTED "$memory_persisted"
+    [[ "$memory_persisted" == "true" ]]
     ;;
   set)
     json="$(printenv SESSION_JSON || true)"
     valid_json "$json" || exit 2
     printf '%s
 ' "$json" > "$state_file"
-    write_memory || true
+    memory_persisted=true
+    if ! write_memory; then
+      memory_persisted=false
+      echo "::warning title=Session memory degraded::Issue-body memory write verification failed; continuing with Git/issue/CI recovery sources."
+    fi
     export_state "$json"
+    emit_env OC_SESSION_MEMORY_PERSISTED "$memory_persisted"
+    [[ "$memory_persisted" == "true" ]]
     ;;
   *) exit 2 ;;
 esac
