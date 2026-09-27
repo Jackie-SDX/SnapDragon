@@ -12,7 +12,8 @@ mode=code
 intent=execute
 resume_requested=false
 merge_requested=false
-session_required=false
+session_required=true
+branch_required=false
 
 if [[ "$lower" =~ ^continue([[:space:]]|$) ]] &&
    ! printf '%s' "$lower" | grep -Eiq '\b(story|stories|chapter|fiction|poem|poetry|essay|prose|dialogue|joke|caption|lyrics?|creative|co-?author|part[[:space:]-]*[0-9]+)\b'; then
