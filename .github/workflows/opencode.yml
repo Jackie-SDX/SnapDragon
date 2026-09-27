@@ -288,6 +288,7 @@ jobs:
           MERGE_EXIT: ${{ env.OC_MERGE_EXIT }}
           RESULT_PUBLISHED: ${{ env.OC_RESULT_PUBLISHED || 'false' }}
           MEMORY_PERSISTED: ${{ env.OC_SESSION_MEMORY_PERSISTED || 'false' }}
+          FINAL_RESPONSE_CAPTURED: ${{ env.OC_FINAL_RESPONSE_CAPTURED || 'false' }}
         run: |
           set -euo pipefail
           success=false
@@ -296,7 +297,7 @@ jobs:
           elif [[ "$CL1" == "true" ]]; then
             [[ "$RESULT_PUBLISHED" == "true" && "$MEMORY_PERSISTED" == "true" ]] && success=true
           elif [[ "$A1" == "success" ]]; then
-            [[ "$RESULT_PUBLISHED" == "true" && "$MEMORY_PERSISTED" == "true" ]] && success=true
+            [[ "$RESULT_PUBLISHED" == "true" && "$MEMORY_PERSISTED" == "true" && "$FINAL_RESPONSE_CAPTURED" == "true" ]] && success=true
           elif [[ "$DW1" == "true" ]]; then
             success=true
           fi
@@ -310,7 +311,9 @@ jobs:
             fi
             exit 0
           fi
-          if [[ "$A1" == "success" && "$RESULT_PUBLISHED" != "true" ]]; then
+          if [[ "$A1" == "success" && "$FINAL_RESPONSE_CAPTURED" != "true" ]]; then
+            echo "::error title=Final response capture not verified::OpenCode succeeded, but its final response was not captured as a non-empty answer."
+          elif [[ "$A1" == "success" && "$RESULT_PUBLISHED" != "true" ]]; then
             echo "::error title=Final response not verified::OpenCode succeeded, but the final issue response was not verified as published."
           elif [[ "$A1" == "success" && "$MEMORY_PERSISTED" != "true" ]]; then
             echo "::error title=Session memory not verified::OpenCode succeeded, but durable session memory was not verified after the response."
