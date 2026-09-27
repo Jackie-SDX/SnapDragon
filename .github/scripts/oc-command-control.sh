@@ -30,13 +30,30 @@ session_required="$(read_back_output OC_SESSION_REQUIRED)"
 task_mode="$(read_back_output OC_TASK_MODE)"
 merge_requested="$(read_back_output OC_MERGE_REQUESTED)"
 session_branch="$(read_back_output OC_SESSION_BRANCH)"
+target_mode="$(read_back_output OC_TARGET_MODE)"
 
 if [[ "${session_required:-false}" == "true" && "${task_mode:-}" == "code" ]]; then
-  # Mechanical lifecycle only: materialize the durable session branch for this
-  # repository request. No capability, permission, or credential decision is
-  # made here — the attempt always runs with the full task environment.
-  TARGET_NUMBER="${TARGET_NUMBER:-0}" BASE_REF="${BASE_REF:-main}" bash .github/scripts/prepare-oc-session.sh
-  OC_SESSION_PHASE=ready OC_SESSION_STATUS=active OC_SESSION_NEXT_ACTION="inspect durable session and continue" OC_DURABLE_WORK=false bash .github/scripts/record-oc-session-progress.sh || true
+  if [[ "${target_mode:-local}" == "remote" ]]; then
+    # Remote-target durability belongs to the target repository. Do not create
+    # a controller-local session branch that can make /oc continue resume the
+    # wrong repository. prepare-oc-target.sh will recover/create the real
+    # target branch in the next lifecycle step.
+    OC_SESSION_PHASE=ready \
+    OC_SESSION_STATUS=active \
+    OC_SESSION_MILESTONE="remote_target_ready" \
+    OC_SESSION_NEXT_ACTION="recover or create the durable target branch, then continue" \
+    OC_SESSION_EVIDENCE="target=${OC_TARGET_REPO:-unknown}@${OC_TARGET_BASE:-main}" \
+    OC_TARGET_REPO="${OC_TARGET_REPO:-}" \
+    OC_TARGET_BASE="${OC_TARGET_BASE:-main}" \
+    OC_TARGET_BRANCH="${OC_TARGET_BRANCH:-}" \
+    OC_DURABLE_WORK=false \
+    bash .github/scripts/record-oc-session-progress.sh || true
+  else
+    # Mechanical lifecycle only: materialize the durable session branch for
+    # controller-local repository requests.
+    TARGET_NUMBER="${TARGET_NUMBER:-0}" BASE_REF="${BASE_REF:-main}" bash .github/scripts/prepare-oc-session.sh
+    OC_SESSION_PHASE=ready OC_SESSION_STATUS=active OC_SESSION_MILESTONE="controller_local_ready" OC_SESSION_NEXT_ACTION="inspect durable session and continue" OC_DURABLE_WORK=false bash .github/scripts/record-oc-session-progress.sh || true
+  fi
 elif [[ "${session_required:-false}" != "true" && -n "${session_branch}" ]]; then
   # Mechanical lifecycle only: an ordinary request does not enter the durable
   # session of an earlier task. Clear it for the later steps so the attempt
