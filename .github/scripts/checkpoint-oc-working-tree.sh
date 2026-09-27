@@ -11,10 +11,9 @@ if [[ -z "$(git -C "$dir" status --porcelain --untracked-files=normal 2>/dev/nul
   exit 0
 fi
 
-git -C "$dir" diff --check >/dev/null 2>&1 || {
-  echo "::warning title=Checkpoint skipped::The current worktree fails git diff --check; preserving it locally."
-  exit 0
-}
+if ! git -C "$dir" diff --check >/dev/null 2>&1; then
+  echo "::warning title=Checkpoint quality warning::The current checkpoint fails git diff --check; preserving it anyway for /oc continue recovery."
+fi
 oc_guard_repo_publication "$dir" || exit 0
 git -C "$dir" add -A
 if git -C "$dir" diff --cached --quiet; then
