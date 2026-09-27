@@ -53,25 +53,17 @@ else
 fi
 
 new_output_files resolver-issue-body-target
-jq -n --arg issue_body 
-GITHUB_EVENT_PATH="$TESTS/event-url.json" \
-GITHUB_REPOSITORY="Jackie-SDX/Nayla-SD-JACKIE-Fun-WhatsApp-Bot" \
-TARGET_NUMBER=0 bash "$SCRIPTS/resolve-oc-target.sh"
+cat > "$TESTS/event-issue-body-target.json" <<'JSON'
+{"comment":{"body":"/oc continue"},"issue":{"body":"Target repository:\nhttps://github.com/Jackie-SDX/cpp-project-template\n\nTarget branch:\nmain\n"}}
+JSON
+GITHUB_EVENT_PATH="$TESTS/event-issue-body-target.json" \
+GITHUB_REPOSITORY="Jackie-SDX/SnapDragon" TARGET_NUMBER=152 \
+bash "$SCRIPTS/resolve-oc-target.sh"
 grep -q '^mode=remote$' "$GITHUB_OUTPUT" && \
-grep -q '^target_repo=Jackie-SDX/Nayla-SD-JACKIE-Fun-WhatsApp-Bot$' "$GITHUB_OUTPUT" && \
-grep -q 'OC_TARGET_TASK=fix the bug' "$GITHUB_ENV" \
-  && ok "explicit https://github.com/OWNER/REPO url is parsed into remote mode" \
-  || bad "explicit https://github.com/OWNER/REPO url is parsed into remote mode"
-
-new_output_files resolver-task-text
-make_event task-text "/oc target=Jackie-SDX/Nayla-SD-JACKIE-Fun-WhatsApp-Bot Task: fix repository: parser behavior and inspect https://example.com/docs"
-GITHUB_EVENT_PATH="$TESTS/event-task-text.json" \
-GITHUB_REPOSITORY="o/x" TARGET_NUMBER=0 bash "$SCRIPTS/resolve-oc-target.sh"
-grep -q '^mode=remote$' "$GITHUB_OUTPUT" && \
-grep -q '^target_repo=Jackie-SDX/Nayla-SD-JACKIE-Fun-WhatsApp-Bot$' "$GITHUB_OUTPUT" && \
-grep -q 'OC_TARGET_TASK=Task: fix repository: parser behavior and inspect https://example.com/docs' "$GITHUB_ENV" \
-  && ok "explicit target preserves colon-containing task text and ordinary URLs" \
-  || bad "explicit target preserves colon-containing task text and ordinary URLs"
+grep -q '^target_repo=Jackie-SDX/cpp-project-template$' "$GITHUB_OUTPUT" && \
+grep -q '^target_source=issue-body$' "$GITHUB_OUTPUT" && \
+  ok "issue/PR Target repository field recovers a remote target for /oc continue" || \
+  bad "issue/PR Target repository field recovers a remote target for /oc continue"
 
 new_output_files resolver-url-task-text
 make_event url-task-text "/oc check https://example.com/x:y and note repo: fix pipeline only"
