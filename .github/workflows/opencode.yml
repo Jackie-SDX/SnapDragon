@@ -71,13 +71,13 @@ jobs:
       UNIVERSAL_TOKEN: ${{ secrets.UNIVERSAL_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
       GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
-      OPENCODE_AGENT_TIMEOUT_MINUTES: "350"
+      OPENCODE_AGENT_TIMEOUT_MINUTES: "330"
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
       COMPOSIO_USER_ID: ${{ vars.COMPOSIO_USER_ID || github.repository_owner }}
       OC_CI_VERIFY_SETTLE_SECONDS: "30"
       OC_JOB_BUDGET_SECONDS: "21600"
-      OC_JOB_SAFETY_MARGIN_SECONDS: "120"
+      OC_JOB_SAFETY_MARGIN_SECONDS: "1800"
       OC_CONTEXT_SEED_BYTES: "60000"
       OC_SESSION_CHECKPOINT_INTERVAL_SECONDS: "300"
       OC_CI_WATCH_MINUTES: "45"
@@ -188,6 +188,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
+          TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
           OC_CONTROLLER_ROOT: ${{ github.workspace }}
         run: bash .github/scripts/prepare-oc-target.sh
 
