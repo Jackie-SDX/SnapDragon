@@ -12,6 +12,7 @@ run_id="${GITHUB_RUN_ID:-0}"
 result_marker="<!-- oc-controller-result:run-$run_id -->"
 marker="$result_marker"
 published_exists=false
+final_response_captured=false
 
 emit_env() { printf '%s=%s\n' "$1" "$2" >> "${GITHUB_ENV:-/dev/null}"; }
 emit_env OC_RESULT_PUBLISHED false
@@ -64,6 +65,7 @@ else
     answer="$(sanitize_response "$response_file")"
   fi
   if [[ -n "$answer" ]]; then
+    final_response_captured=true
     emit_env OC_FINAL_RESPONSE_CAPTURED true
     body="$(printf "%s\n## /oc\n\n%s" "$marker" "$answer")"
   elif [[ "$a1" == "success" ]]; then
@@ -89,6 +91,12 @@ if ! gh api --paginate --slurp "/repos/$repo/issues/$target/comments?per_page=10
 fi
 emit_env OC_RESULT_PUBLISHED true
 
+if [[ "${A1:-}" == "success" && "${MERGE_REQUESTED:-false}" != "true" && "${CL1:-false}" != "true" && "$final_response_captured" != "true" ]]; then
+  emit_env OC_FINAL_RESPONSE_CAPTURED false
+  echo "::error title=Final response capture failed::OpenCode reported success but no non-empty final response was captured." >&2
+  exit 1
+fi
+
 if [[ "${A1:-}" == "success" && "${MERGE_REQUESTED:-false}" != "true" ]]; then
   OC_SESSION_PHASE="completed" \
   OC_SESSION_STATUS="complete" \
@@ -113,9 +121,3 @@ if [[ "$memory_persisted" != "true" ]]; then
   exit 1
 fi
 emit_env OC_SESSION_MEMORY_PERSISTED true
-
-if [[ "${A1:-}" == "success" && "${MERGE_REQUESTED:-false}" != "true" && "${CL1:-false}" != "true" && "${OC_FINAL_RESPONSE_CAPTURED:-false}" != "true" ]]; then
-  emit_env OC_FINAL_RESPONSE_CAPTURED false
-  echo "::error title=Final response capture failed::OpenCode reported success but no non-empty final response was captured." >&2
-  exit 1
-fi
