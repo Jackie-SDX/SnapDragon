@@ -25,6 +25,7 @@ repo="${OC_TARGET_REPO:?OC_TARGET_REPO is required}"
 base="${OC_TARGET_BASE:-main}"
 resume="${OC_TARGET_RESUME:-0}"
 task="${OC_TARGET_TASK:-}"
+target_number="${TARGET_NUMBER:-0}"
 runner_temp="${RUNNER_TEMP:-/tmp}"
 clone_url="${OC_TARGET_CLONE_URL:-https://github.com/$repo.git}"
 
@@ -39,9 +40,39 @@ fi
 
 owner="${repo%%/*}"
 repo_name="${repo#*/}"
-slug="$(printf '%s@%s#%s' "$repo" "$base" "$task" | sha256sum | cut -c1-12)"
-default_branch="oc/remote-${owner}-${repo_name}-${base}-${slug}"
-branch="${OC_TARGET_BRANCH:-$default_branch}"
+
+# Recovery-first branch selection: when an issue already has an
+# oc/issue-N-* target branch, reuse it even if the prior controller state
+# comment was incomplete. This prevents /oc continue from creating duplicate
+# work from the literal word "continue".
+branch="${OC_TARGET_BRANCH:-}"
+if [[ -z "$branch" && "$target_number" =~ ^[1-9][0-9]*$ ]]; then
+  discovered_branch="$(
+    gh pr list --repo "$repo" --base "$base" --state all --limit 50 \
+      --json headRefName,updatedAt \
+      --jq --arg prefix "oc/issue-${target_number}-" 'map(select(.headRefName | startswith($prefix))) | sort_by(.updatedAt // "") | last | (.headRefName // "")' 2>/dev/null || true
+  )"
+  if [[ -z "$discovered_branch" ]]; then
+    discovered_branch="$(
+      gh api --paginate --slurp "/repos/$repo/branches?per_page=100" 2>/dev/null | \
+        jq -r --arg prefix "oc/issue-${target_number}-" 'add // [] | map(.name) | map(select(startswith($prefix))) | .[0] // ""' 2>/dev/null || true
+    )"
+  fi
+  if [[ -n "$discovered_branch" && "$discovered_branch" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    branch="$discovered_branch"
+    resume="1"
+    echo "Recovered existing issue-scoped target branch: $branch"
+  fi
+fi
+
+if [[ -z "$branch" ]]; then
+  if [[ "$target_number" =~ ^[1-9][0-9]*$ ]]; then
+    branch="oc/remote-${owner}-${repo_name}-issue-${target_number}"
+  else
+    slug="$(printf '%s@%s#%s' "$repo" "$base" "$task" | sha256sum | cut -c1-12)"
+    branch="oc/remote-${owner}-${repo_name}-${base}-${slug}"
+  fi
+fi
 if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ ]]; then
   echo "::error title=Invalid target branch::Derived branch name is not a valid Git ref: $branch" >&2
   exit 2

@@ -227,6 +227,39 @@ printf "[OC][attempt=%s][elapsed=0s] started route=%s\n" "$attempt" "${MODEL:-gi
 echo "[OC][attempt=${attempt}][elapsed=0s] started route=${MODEL:-github}"
 mkfifo "$fifo"
 
+checkpoint_session_state() {
+  local elapsed="$1"
+  local branch="" head="" dirty="false" durable="false" target_note="" base_head=""
+  if [[ "${OC_TARGET_MODE:-local}" == "remote" && -n "${OC_TARGET_WORKSPACE:-}" && -d "${OC_TARGET_WORKSPACE:-}" ]]; then
+    branch="$(git -C "$OC_TARGET_WORKSPACE" branch --show-current 2>/dev/null || true)"
+    head="$(git -C "$OC_TARGET_WORKSPACE" rev-parse HEAD 2>/dev/null || true)"
+    [[ -n "$(git -C "$OC_TARGET_WORKSPACE" status --porcelain 2>/dev/null || true)" ]] && dirty="true"
+    base_head="$(git -C "$OC_TARGET_WORKSPACE" rev-parse "origin/${OC_TARGET_BASE:-main}" 2>/dev/null || true)"
+    if [[ "$head" =~ ^[0-9a-f]{40}$ && "$base_head" =~ ^[0-9a-f]{40}$ && "$head" != "$base_head" ]]; then durable="true"; fi
+    [[ "$dirty" == "true" ]] && durable="true"
+    target_note="target=${OC_TARGET_REPO:-unknown}@${branch:-unknown} head=${head:-unknown} dirty=${dirty}"
+  elif [[ -n "$agent_worktree" && -d "$agent_worktree" ]]; then
+    branch="$(git -C "$agent_worktree" branch --show-current 2>/dev/null || true)"
+    head="$(git -C "$agent_worktree" rev-parse HEAD 2>/dev/null || true)"
+    [[ -n "$(git -C "$agent_worktree" status --porcelain 2>/dev/null || true)" ]] && durable="true"
+    target_note="controller-branch=${branch:-detached} head=${head:-unknown} dirty=${durable}"
+  else
+    target_note="workspace not available for checkpoint"
+  fi
+  if [[ -n "${OC_SESSION_STATE_FILE:-}" ]]; then
+    OC_SESSION_PHASE="working" \
+    OC_SESSION_STATUS="active" \
+    OC_SESSION_MILESTONE="heartbeat_checkpoint" \
+    OC_SESSION_NEXT_ACTION="continue current task from the durable target branch; inspect existing work and CI" \
+    OC_SESSION_EVIDENCE="elapsed=${elapsed}s; ${target_note}" \
+    OC_SESSION_BRANCH="$branch" \
+    OC_SESSION_HEAD_SHA="$head" \
+    OC_SESSION_ATTEMPT="$attempt" \
+    OC_DURABLE_WORK="$durable" \
+    bash "$controller_root/.github/scripts/record-oc-session-progress.sh" || true
+  fi
+}
+
 heartbeat() {
   local elapsed next_checkpoint=300
   while kill -0 "$agent_pid" 2>/dev/null; do
@@ -236,6 +269,7 @@ heartbeat() {
     printf "[OC][attempt=%s][elapsed=%ss] heartbeat state=running\n" "$attempt" "$elapsed" >> "$progress_log"
     if (( elapsed >= next_checkpoint )); then
       checkpoint_worktree
+      checkpoint_session_state "$elapsed"
       next_checkpoint=$((elapsed + 300))
     fi
   done
@@ -272,8 +306,17 @@ if [[ "$task_mode" == "code" && -n "$agent_cwd" ]]; then
 fi
 
 agent_branch=""
-if [[ -n "$agent_worktree" && -e "$agent_worktree/.git" ]]; then
+session_head_sha=""
+remote_dirty="false"
+remote_base_sha=""
+if [[ "${OC_TARGET_MODE:-local}" == "remote" && -n "${OC_TARGET_WORKSPACE:-}" && -d "${OC_TARGET_WORKSPACE:-}" ]]; then
+  agent_branch="${OC_TARGET_BRANCH:-$(git -C "$OC_TARGET_WORKSPACE" branch --show-current 2>/dev/null || true)}"
+  session_head_sha="$(git -C "$OC_TARGET_WORKSPACE" rev-parse HEAD 2>/dev/null || true)"
+  remote_base_sha="$(git -C "$OC_TARGET_WORKSPACE" rev-parse "origin/${OC_TARGET_BASE:-main}" 2>/dev/null || true)"
+  [[ -n "$(git -C "$OC_TARGET_WORKSPACE" status --porcelain 2>/dev/null || true)" ]] && remote_dirty="true"
+elif [[ -n "$agent_worktree" && -e "$agent_worktree/.git" ]]; then
   agent_branch="$(git -C "$agent_worktree" branch --show-current 2>/dev/null || true)"
+  session_head_sha="$(git -C "$agent_worktree" rev-parse HEAD 2>/dev/null || true)"
 fi
 printf "agent_branch=%s\n" "$agent_branch" >> "$output_file"
 

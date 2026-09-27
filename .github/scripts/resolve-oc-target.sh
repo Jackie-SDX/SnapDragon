@@ -37,10 +37,13 @@ target_base=""
 target_branch=""
 resume="0"
 from_marker="0"
+target_source=""
 raw_task=""
+issue_body=""
 
 if [[ -n "$event_file" && -f "$event_file" ]]; then
   raw_task="$(jq -r '.comment.body // empty' "$event_file")"
+  issue_body="$(jq -r '.issue.body // .pull_request.body // empty' "$event_file")"
 fi
 raw_task="$(printf '%s' "$raw_task" | sed -E 's#^/[A-Za-z]+[[:space:]]*##')"
 task="$raw_task"
@@ -200,10 +203,50 @@ if [[ "$mode" == "local" && "$raw_task" =~ ^continue([[:space:]]|$) ]]; then
   fi
 fi
 
+# Recover an explicit Target repository field from the issue/PR body when
+# the /oc comment itself has no target and no prior durable marker exists.
+# Keep this deliberately narrow so arbitrary URLs in task text never become
+# remote targets.
+if [[ "$mode" == "local" && -n "$issue_body" ]]; then
+  # Accept both documented forms:
+  #   Target repository: OWNER/REPO
+  # and
+  #   Target repository:
+  #   https://github.com/OWNER/REPO
+  issue_target="$(
+    awk '
+      /^[[:space:]]*Target[[:space:]]+(repository|repo)[[:space:]]*:/ {
+        line=$0
+        sub(/^[^:]*:[[:space:]]*/, "", line)
+        if (line != "") { print line; exit }
+        if (getline nextline > 0) {
+          sub(/^[[:space:]]*/, "", nextline)
+          print nextline
+          exit
+        }
+      }
+    ' <<<"$issue_body"
+  )"
+  if [[ -n "$issue_target" ]]; then
+    issue_target="$(printf '%s' "$issue_target" | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+    issue_target="${issue_target#https://github.com/}"
+    issue_target="${issue_target#http://github.com/}"
+    issue_target="${issue_target#github.com/}"
+    issue_target="$(clean_arg "$issue_target")"
+    if valid_repo "$issue_target" && ! is_placeholder_repo "$issue_target"; then
+      if set_target "$issue_target"; then
+        target_source="issue-body"
+        echo "Recovered remote target from explicit issue/PR body field: $target_repo"
+      fi
+    fi
+  fi
+fi
+
 [[ -n "$target_base" ]] || target_base="main"
 [[ -n "$controller_repo" ]] && controller_target_ok=1 || true
 
 emit_env OC_TARGET_MODE "$mode"
+emit_env OC_TARGET_SOURCE "${target_source:-command-or-marker}"
 if [[ "$mode" == "remote" ]]; then
   emit_env OC_TARGET_REPO "$target_repo"
   emit_env OC_TARGET_BASE "$target_base"
@@ -216,6 +259,7 @@ fi
 
 emit_out mode "$mode"
 emit_out target_repo "$target_repo"
+emit_out target_source "${target_source:-command-or-marker}"
 emit_out target_base "$target_base"
 emit_out target_branch "$target_branch"
 emit_out resume "$resume"

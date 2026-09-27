@@ -52,6 +52,31 @@ else
   bad "local mode preserved with full task for a plain /oc comment"
 fi
 
+new_output_files resolver-issue-body-target
+cat > "$TESTS/event-issue-body-target.json" <<'JSON'
+{"comment":{"body":"/oc continue"},"issue":{"body":"Target repository:\nhttps://github.com/Jackie-SDX/cpp-project-template\n\nTarget branch:\nmain\n"}}
+JSON
+GITHUB_EVENT_PATH="$TESTS/event-issue-body-target.json" \
+GITHUB_REPOSITORY="Jackie-SDX/SnapDragon" TARGET_NUMBER=152 \
+bash "$SCRIPTS/resolve-oc-target.sh"
+grep -q '^mode=remote$' "$GITHUB_OUTPUT" && \
+grep -q '^target_repo=Jackie-SDX/cpp-project-template$' "$GITHUB_OUTPUT" && \
+grep -q '^target_source=issue-body$' "$GITHUB_OUTPUT" && \
+  ok "two-line issue-body Target repository field recovers a remote target for /oc continue" || \
+  bad "two-line issue-body Target repository field recovers a remote target for /oc continue"
+
+new_output_files resolver-issue-body-inline
+cat > "$TESTS/event-issue-body-inline.json" <<'JSON'
+{"comment":{"body":"/oc continue"},"issue":{"body":"Target repository: Jackie-SDX/cpp-project-template\n"}}
+JSON
+GITHUB_EVENT_PATH="$TESTS/event-issue-body-inline.json" \
+GITHUB_REPOSITORY="Jackie-SDX/SnapDragon" TARGET_NUMBER=152 \
+bash "$SCRIPTS/resolve-oc-target.sh"
+grep -q '^mode=remote$' "$GITHUB_OUTPUT" && \
+grep -q '^target_repo=Jackie-SDX/cpp-project-template$' "$GITHUB_OUTPUT" && \
+grep -q '^target_source=issue-body$' "$GITHUB_OUTPUT" && \
+  ok "inline issue-body Target repository field recovers a remote target for /oc continue" || \
+  bad "inline issue-body Target repository field recovers a remote target for /oc continue"
 new_output_files resolver-url
 make_event url "/oc fix the bug https://github.com/Jackie-SDX/Nayla-SD-JACKIE-Fun-WhatsApp-Bot"
 GITHUB_EVENT_PATH="$TESTS/event-url.json" \
