@@ -16,7 +16,6 @@ if gh api --paginate --slurp "/repos/$repo/issues/$target/comments?per_page=100"
   exit 0
 fi
 
-task_mode="${TASK_MODE:-report}"
 body=""
 clarification_file="$RUNNER_TEMP/oc-clarification.md"
 
@@ -51,39 +50,19 @@ elif [[ "${MERGE_REQUESTED:-false}" == "true" ]]; then
     body="$(printf "%s\n## /oc\nMerge command did not complete successfully. No merge success is claimed." "$marker")"
   fi
 else
-  response_file="${RUNNER_TEMP:-/tmp}/opencode-final-response-1.md"
+  runner_temp="$(printenv RUNNER_TEMP || printf /tmp)"
+  response_file="$runner_temp/opencode-final-response-1.md"
   answer=""
-  if [[ "${A1:-}" == "success" && -s "$response_file" ]]; then
+  a1="$(printenv A1 || true)"
+  if [[ "$a1" == "success" && -s "$response_file" ]]; then
     answer="$(sanitize_response "$response_file")"
   fi
   if [[ -n "$answer" ]]; then
     body="$(printf "%s\n## /oc\n\n%s" "$marker" "$answer")"
-  elif [[ "$task_mode" == "report" && "${A1:-}" == "success" ]]; then
-    body="$(printf "%s\n## /oc\nOpenCode completed, but no clean final response was captured." "$marker")"
-  elif [[ "$A1" != "success" ]]; then
-    body="$(printf "%s\n## /oc\nAgent did not complete successfully. No success is claimed." "$marker")"
+  elif [[ "$a1" == "success" ]]; then
+    body="$(printf "%s\n## /oc\nOpenCode completed, but its final response was not captured." "$marker")"
   else
-    if [[ "${OC_TARGET_MODE:-local}" == "remote" && -n "${OC_TARGET_REPO:-}" && -n "${OC_TARGET_BRANCH:-}" ]]; then
-      remote_sha="$(gh api "/repos/$OC_TARGET_REPO/git/ref/heads/$OC_TARGET_BRANCH" --jq '.object.sha' 2>/dev/null || true)"
-      if [[ "$remote_sha" =~ ^[0-9a-f]{40}$ ]]; then
-        summary="Completed target work on $OC_TARGET_REPO@$OC_TARGET_BRANCH at $remote_sha."
-      else
-        summary="OpenCode completed, but the target branch could not be observed."
-      fi
-      [[ "${P1:-}" == "published" && -n "${PR1:-}" ]] && summary="$summary PR: $PR1"
-    else
-      if [[ -n "${PR1:-}" ]]; then
-        summary="Completed and published: $PR1"
-      elif [[ "${P1:-}" == "checkpointed" ]]; then
-        summary="Durable work checkpointed; resume with /oc continue."
-      else
-        summary="OpenCode completed successfully."
-      fi
-    fi
-    if [[ "${V1:-}" == "true" && -n "${SHA1:-}" ]]; then
-      summary="$summary Verified exact SHA $SHA1 with observable CI checks."
-    fi
-    body="$(printf "%s\n## /oc\n%s" "$marker" "$summary")"
+    body="$(printf "%s\n## /oc\nOpenCode did not complete successfully. No success is claimed." "$marker")"
   fi
 fi
 

@@ -11,7 +11,6 @@ printf '%s\n' "$request" > "$request_file"
 mode=code
 intent=execute
 resume_requested=false
-publish_requested=false
 merge_requested=false
 session_required=false
 
@@ -21,7 +20,6 @@ if [[ "$lower" =~ ^continue([[:space:]]|$) ]] &&
   session_required=true
   mode=code
   intent=continue
-  publish_requested=false
   request="$(printf '%s' "$request" | sed -E 's#^continue[[:space:]]*##')"
   printf '%s\n' "$request" > "$request_file"
 elif [[ "$lower" =~ ^merge([[:space:]]|$) ]]; then
@@ -33,7 +31,6 @@ else
   positive_request="$(printf '%s' "$lower" | sed -E -e '/^[[:space:]]*(do not|dont|don'\''t|without)\b/d' -e 's/\b(do not|dont|don'\''t|without)\b.*$//g')"
 
   if printf '%s' "$positive_request" | grep -Eiq '\b(create|open|publish|submit)[[:space:]]+(a[[:space:]]+)?(pull[[:space:]-]*request|pr)\b'; then
-    publish_requested=true
     session_required=true
     intent=publish
   elif printf '%s' "$positive_request" | grep -Eiq '\b(fix|edit|change|modify|implement|add|remove|create|delete|refactor|debug|repair|update|build|write|test|patch|migrate|replace|rename|commit|push|merge|release)\b'; then
@@ -65,8 +62,7 @@ emit_env OC_REQUEST_FILE "$request_file"
 emit_env OC_TASK_MODE "$mode"
 emit_env OC_INTENT "$intent"
 emit_env OC_RESUME_REQUESTED "$resume_requested"
-emit_env OC_PUBLISH_REQUESTED "$publish_requested"
 emit_env OC_MERGE_REQUESTED "$merge_requested"
 emit_env OC_SESSION_REQUIRED "$session_required"
 
-echo "Selected /oc lifecycle=agent mode=$mode intent=$intent resume=$resume_requested publish=$publish_requested merge=$merge_requested"
+echo "Selected /oc mode=$mode intent=$intent resume=$resume_requested merge=$merge_requested"

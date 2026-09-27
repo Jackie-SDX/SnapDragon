@@ -245,11 +245,6 @@ jobs:
           OC_TARGET_REPO: ${{ steps.target.outputs.target_repo }}
           OC_TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
           A1: ${{ steps.attempt_1.outputs.agent_outcome }}
-          P1: ${{ steps.attempt_1.outputs.publish_outcome }}
-          V1: ${{ steps.attempt_1.outputs.verified }}
-          PR1: ${{ steps.attempt_1.outputs.pr_url }}
-          SHA1: ${{ steps.attempt_1.outputs.verified_sha }}
-          SAFE_LOG: ${{ steps.attempt_1.outputs.safe_log_path }}
           CL1: ${{ steps.attempt_1.outputs.clarification_required }}
           MERGE_REQUESTED: ${{ env.OC_MERGE_REQUESTED }}
           MERGE_EXIT: ${{ env.OC_MERGE_EXIT }}
@@ -259,7 +254,6 @@ jobs:
         if: always()
         env:
           A1: ${{ steps.attempt_1.outputs.agent_outcome }}
-          P1: ${{ steps.attempt_1.outputs.publish_outcome }}
           DW1: ${{ steps.attempt_1.outputs.durable_work }}
           CL1: ${{ steps.attempt_1.outputs.clarification_required }}
           TASK_MODE: ${{ env.OC_TASK_MODE }}

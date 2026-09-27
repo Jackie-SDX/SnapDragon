@@ -1,5 +1,5 @@
 name: OpenCode attempt
-description: Run one primary OpenCode execution and publish durable work when requested.
+description: Run one primary OpenCode execution.
 inputs:
   attempt:
     required: true
@@ -26,30 +26,12 @@ outputs:
     value: ${{ steps.run.outputs.agent_outcome }}
   termination_reason:
     value: ${{ steps.run.outputs.termination_reason }}
-  verified:
-    value: ${{ steps.run.outputs.verified }}
   timed_out:
     value: ${{ steps.run.outputs.timed_out }}
-  pr_url:
-    value: ${{ steps.run.outputs.pr_url }}
-  verified_sha:
-    value: ${{ steps.run.outputs.verified_sha }}
-  ci_surfaces:
-    value: ${{ steps.run.outputs.ci_surfaces }}
-  ci_run_id:
-    value: ${{ steps.run.outputs.ci_run_id }}
-  publish_outcome:
-    value: ${{ steps.run.outputs.publish_outcome }}
   safe_log_path:
     value: ${{ steps.run.outputs.safe_log_path }}
-  attempt_elapsed_seconds:
-    value: ${{ steps.run.outputs.attempt_elapsed_seconds }}
-  result_state:
-    value: ${{ steps.run.outputs.result_state }}
   durable_work:
     value: ${{ steps.run.outputs.durable_work }}
-  session_head_sha:
-    value: ${{ steps.run.outputs.session_head_sha }}
   clarification_required:
     value: ${{ steps.run.outputs.clarification_required }}
 runs:

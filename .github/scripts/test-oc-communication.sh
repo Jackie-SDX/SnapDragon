@@ -78,8 +78,6 @@ body="$(cat "$tmp/comment")"
 grep -Fq 'story response without PR publication' <<<"$body"
 absent_in 'Publication was not requested' <<<"$body"
 absent 'tail -n 160 "$REPORT_LOG"' "$root/.github/workflows/opencode.yml"
-absent 'safe_tail="$(gh run view' "$root/.github/scripts/verify-agent-result.sh"
-absent 'Sanitized failure evidence:' "$root/.github/scripts/verify-agent-result.sh"
 # Current communication contract: the triggering comment is claimed with an
 # authenticated eyes reaction and the running reaction is cleared when the run
 # finishes. The obsolete "Mark triggering /oc comment as running" workflow step
