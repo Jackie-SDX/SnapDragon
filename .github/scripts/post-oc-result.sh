@@ -66,8 +66,31 @@ else
   fi
 fi
 
-body="$body"$'
-'"$result_marker"
+if [[ "${A1:-}" == "success" && "${MERGE_REQUESTED:-false}" != "true" ]]; then
+  OC_SESSION_PHASE="completed" \
+  OC_SESSION_STATUS="complete" \
+  OC_SESSION_MILESTONE="response_published" \
+  OC_SESSION_NEXT_ACTION="await user direction" \
+  OC_SESSION_EVIDENCE="final OpenCode response published by run $run_id" \
+  OC_DURABLE_WORK="false" \
+  bash .github/scripts/record-oc-session-progress.sh >/dev/null 2>&1 || true
+elif [[ "${CL1:-false}" == "true" ]]; then
+  OC_SESSION_PHASE="waiting_for_clarification" \
+  OC_SESSION_STATUS="waiting" \
+  OC_SESSION_MILESTONE="clarification_requested" \
+  OC_SESSION_NEXT_ACTION="answer the clarification request, then resume with /oc continue" \
+  OC_DURABLE_WORK="false" \
+  bash .github/scripts/record-oc-session-progress.sh >/dev/null 2>&1 || true
+fi
+
+body="$body"if [[ -n "${GH_COMMENT_FILE:-}" ]]; then
+  # Deterministic test seam used by controller contract tests; production keeps
+  # the API-based publisher unchanged.
+  gh issue comment "$target" --body "$body" >/dev/null
+else
+  gh api -X POST -f body="$body" "/repos/$repo/issues/$target/comments" >/dev/null
+fi
+\n'"$result_marker"
 if [[ -n "${GH_COMMENT_FILE:-}" ]]; then
   # Deterministic test seam used by controller contract tests; production keeps
   # the API-based publisher unchanged.
