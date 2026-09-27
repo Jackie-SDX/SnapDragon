@@ -17,6 +17,8 @@ mkdir -p "$runner_temp"
 
 context_degraded=false
 issue_comments_complete=true
+review_comments_complete=true
+reference_complete=true
 ci_complete=true
 ci_file="$runner_temp/oc-live-ci.md"
 ci_runs_json="$runner_temp/oc-live-ci-runs.json"
@@ -78,21 +80,38 @@ fi
 done < "$comments_tmp"
 
 echo "## Pull-request review comments (chronological)" >> "$full"
-while IFS= read -r encoded; do
-  [[ -n "$encoded" ]] || continue
-  row="$(printf '%s' "$encoded" | base64 -d 2>/dev/null || true)"
-  id="$(jq -r '.[0]' <<<"$row")"
-  user="$(jq -r '.[1] // "unknown"' <<<"$row")"
-  created="$(jq -r '.[2] // ""' <<<"$row")"
-  body="$(jq -r '.[3] // ""' <<<"$row")"
-  start="$(( $(wc -l < "$full") + 1 ))"
-  {
-    printf '### Review comment #%s — @%s — %s\n\n' "$id" "$user" "$created"
-    printf '%s\n\n---\n' "$body"
-  } >> "$full"
-  end="$(wc -l < "$full")"
-  printf 'review:%s\t%s\t%s\t%s\n' "$id" "$created" "$start" "$end" >> "$index"
-done < <(gh api --paginate --jq '.[] | [.id, .user.login, .created_at, .body] | @base64' "/repos/$repo/pulls/$target/comments?per_page=100" 2>/dev/null || true)
+if [[ "$is_pr" == "true" ]]; then
+  review_tmp="$runner_temp/oc-review-comments-jsonl"
+  if ! gh api --paginate --jq '.[] | [.id, .user.login, .created_at, .body] | @base64' "/repos/$repo/pulls/$target/comments?per_page=100" > "$review_tmp"; then
+    review_comments_complete=false
+    context_degraded=true
+    : > "$review_tmp"
+  fi
+  while IFS= read -r encoded; do
+    [[ -n "$encoded" ]] || continue
+    row="$(printf '%s' "$encoded" | base64 -d 2>/dev/null || true)"
+    [[ -n "$row" ]] || { review_comments_complete=false; context_degraded=true; continue; }
+    id="$(jq -r '.[0]' <<<"$row")"
+    user="$(jq -r '.[1] // "unknown"' <<<"$row")"
+    created="$(jq -r '.[2] // ""' <<<"$row")"
+    body="$(jq -r '.[3] // ""' <<<"$row")"
+    start="$(( $(wc -l < "$full") + 1 ))"
+    {
+      printf '### Review comment #%s — @%s — %s
+
+' "$id" "$user" "$created"
+      printf '%s
+
+---
+' "$body"
+    } >> "$full"
+    end="$(wc -l < "$full")"
+    printf 'review:%s	%s	%s	%s
+' "$id" "$created" "$start" "$end" >> "$index"
+  done < "$review_tmp"
+else
+  echo "Review comments not applicable: target is not a pull request." >> "$full"
+fi
 
 request="$(cat "$request_file" 2>/dev/null || jq -r '.comment.body // ""' "${GITHUB_EVENT_PATH:-/dev/null}" 2>/dev/null || true)"
 reference_urls="$(grep -Eo 'https?://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(issues|pull)/[0-9]+' <<<"$request" 2>/dev/null || true)"
@@ -108,9 +127,15 @@ while IFS= read -r url; do
     echo
     echo "## Referenced GitHub item: $url"
     echo
-    gh api "/repos/$owner/$rrepo/issues/$number" 2>/dev/null |
-      jq -r '"Title: \(.title // "")\nAuthor: @\(.user.login // "unknown")\nState: \(.state // "unknown")\n\n\(.body // "")\n\n---"' || true
-    gh api --paginate --jq '.[] | "### Comment #\(.id) — @\(.user.login // "unknown") — \(.created_at // "")\n\n\(.body // "")\n\n---"' "/repos/$owner/$rrepo/issues/$number/comments?per_page=100" 2>/dev/null || true
+    if ! gh api "/repos/$owner/$rrepo/issues/$number" 2>/dev/null |
+      jq -r '"Title: \(.title // "")\nAuthor: @\(.user.login // "unknown")\nState: \(.state // "unknown")\n\n\(.body // "")\n\n---"'; then
+      reference_complete=false
+      context_degraded=true
+    fi
+    if ! gh api --paginate --jq '.[] | "### Comment #\(.id) — @\(.user.login // "unknown") — \(.created_at // "")\n\n\(.body // "")\n\n---"' "/repos/$owner/$rrepo/issues/$number/comments?per_page=100"; then
+      reference_complete=false
+      context_degraded=true
+    fi
   } >> "$refs"
 done < <(printf '%s\n' "$reference_urls" | sort -u | head -n 5)
 
@@ -189,6 +214,8 @@ full_size="$(wc -c < "$full")"
   printf 'OC_ISSUE_CONTEXT_BYTES=%s\n' "$full_size"
   printf 'OC_CONTEXT_DEGRADED=%s\n' "$context_degraded"
   printf 'OC_CONTEXT_ISSUE_COMMENTS_COMPLETE=%s\n' "$issue_comments_complete"
+  printf 'OC_CONTEXT_REVIEW_COMMENTS_COMPLETE=%s\n' "$review_comments_complete"
+  printf 'OC_CONTEXT_REFERENCE_COMPLETE=%s\n' "$reference_complete"
   printf 'OC_CONTEXT_CI_COMPLETE=%s\n' "$ci_complete"
   printf 'OC_CONTEXT_CI_FILE=%s\n' "$ci_file"
   printf 'OC_CONTEXT_CI_RUN_IDS=%s\n' "$(cat "$runner_temp/oc-ci-run-ids" 2>/dev/null || true)"
