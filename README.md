@@ -1,20 +1,35 @@
 <div align="center">
 
-# 🐉 SnapDragon
+# 🐉✨ SnapDragon ✨🐉
 
-**A self-hosted [OpenCode](https://opencode.ai) agent that lives inside your GitHub repo.**
+### *The GitHub-native [OpenCode](https://opencode.ai) agent that lives inside your repo*
 
-Comment `/oc` on any issue or PR and the agent inspects, edits, tests, and reports back —
-straight from GitHub Actions, with durable sessions and automatic recovery.
+Comment `/oc` on any issue or PR and the agent inspects, edits, tests and reports back —
+straight from GitHub Actions, with durable sessions and automatic recovery. 🚀
 
-![OpenCode](https://img.shields.io/badge/OpenCode-1.18.32-8A2BE2?style=flat-square&logo=opencode&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-Workflow-ea4aaa?style=flat-square&logo=githubactions&logoColor=white)
-![Composio MCP](https://img.shields.io/badge/Composio-MCP_bridge-1f6feb?style=flat-square&logo=composio&logoColor=white)
-![Model](https://img.shields.io/badge/model-mimo--v2.6--flash--free-2ea44f?style=flat-square)
+![OpenCode](https://img.shields.io/badge/OpenCode-1.18.32-8A2BE2?style=for-the-badge&logo=opencode&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-workflow-ea4aaa?style=for-the-badge&logo=githubactions&logoColor=white)
+![Composio MCP](https://img.shields.io/badge/Composio-MCP_bridge-1f6feb?style=for-the-badge&logo=composio&logoColor=white)
+![Model](https://img.shields.io/badge/model-mimo--v2.6--flash--free-2ea44f?style=for-the-badge)
 
-🟥 🟧 🟨 🟩 🟦 🟪
+![vibes](https://img.shields.io/badge/vibes-100%25%20🌈-ff69b4?style=flat-square)
+![sessions](https://img.shields.io/badge/sessions-durable%20💤%20resumable-ff69b4?style=flat-square)
+![safety](https://img.shields.io/badge/safety-secrets%20redacted%20🔒-2ea44f?style=flat-square)
+![speed](https://img.shields.io/badge/speed-cached%20%26%20verified%20⚡-d97706?style=flat-square)
+
+🟥 🟧 🟨 🟩 🟦 🟪 🌈
+
+**[Quick start](#-quick-start-5-steps)** •
+**[Commands](#-commands)** •
+**[Config](#%EF%B8%8F-configuration)** •
+**[Verify](#-verify-a-checkout)**
 
 </div>
+
+---
+
+> ### 🎤 “Talk to your CI like you'd text a friend.”
+> One comment in, one full report out — plans, edits, tests, evidence.
 
 ---
 
@@ -23,8 +38,9 @@ straight from GitHub Actions, with durable sessions and automatic recovery.
 - 🗨️ **Zero setup per task** — just type `/oc fix the flaky test` in a comment.
 - 🧠 **Durable memory** — long runs checkpoint, time out cleanly, and resume with `/oc continue`.
 - 🔒 **Safe by default** — secrets are redacted from logs, sharing is disabled, no credentials in git.
-- ⚡ **Fast & verified** — OpenCode is installed from a sha256-verified release and cached daily.
+- ⚡ **Fast & verified** — OpenCode installs from a sha256-verified release and is cached daily.
 - 📈 **Fully observable** — live log stream, machine-readable run records, session artifacts.
+- 🎁 **Batteries included** — cache warmer, PDF exporter and Dependabot ship in the box.
 
 ---
 
@@ -33,26 +49,26 @@ straight from GitHub Actions, with durable sessions and automatic recovery.
 ```text
 opencode.json                     # model, agent, MCP bridge, permissions
 .opencode/
-├── instructions.md               # the operator contract the agent follows
-├── plugins/agentic-observability.js  # live event stream + secret redaction
-└── package.json                  # @opencode-ai/plugin
+├── instructions.md               # 📜 the operator contract the agent follows
+├── plugins/agentic-observability.js  # 📡 live event stream + secret redaction
+└── package.json                  # 📦 @opencode-ai/plugin
 .github/
-├── workflows/opencode.yml        # the /oc runner (issue + PR comments)
-├── workflows/opencode-cache.yml  # daily verified-binary cache warmer
-├── workflows/pandoc-pdf.yml      # bonus: Markdown → PDF via Pandoc
-├── actions/oc-attempt/           # one full agent attempt
-└── scripts/                      # session state, context, publish, recovery
-docs/                             # run-record + demo docs
+├── workflows/opencode.yml        # 🎯 the /oc runner (issue + PR comments)
+├── workflows/opencode-cache.yml  # 🧊 daily verified-binary cache warmer
+├── workflows/pandoc-pdf.yml      # 🎁 bonus: Markdown → PDF via Pandoc
+├── actions/oc-attempt/           # 🧪 one full agent attempt
+└── scripts/                      # 🛠️ session state, context, publish, recovery
+docs/                             # 📚 run-record + demo docs
 ```
 
 ---
 
-## 🚀 Set up your own (5 steps)
+## 🚀 Quick start (5 steps)
 
-**1 · Copy the wiring**
+**1️⃣ · Copy the wiring**
 Bring over `opencode.json`, `.opencode/`, `.github/workflows/`, `.github/actions/`, and `.github/scripts/`.
 
-**2 · Add the secrets** → *Settings → Secrets and variables → Actions*
+**2️⃣ · Add the secrets** → *Settings → Secrets and variables → Actions*
 
 | Secret | Required | Purpose |
 | --- | --- | --- |
@@ -60,7 +76,7 @@ Bring over `opencode.json`, `.opencode/`, `.github/workflows/`, `.github/actions
 | `UNIVERSAL_TOKEN` | ⚪ | PAT with cross-repo rights; falls back to `GITHUB_TOKEN` |
 | `COMPOSIO_API_KEY` | ⚪ | enables the Composio MCP tool bridge |
 
-**3 · Add the variables** (optional tuning)
+**3️⃣ · Add the variables** (optional tuning)
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -68,10 +84,10 @@ Bring over `opencode.json`, `.opencode/`, `.github/workflows/`, `.github/actions
 | `OPENCODE_VERSION` | `1.18.32` | pinned, digest-verified OpenCode release |
 | `COMPOSIO_USER_ID` | repo owner | Composio workspace identity |
 
-**4 · Allow the operator**
+**4️⃣ · Allow the operator**
 The workflow only answers the repository owner — keep `.github/CODEOWNERS` pointing at your account.
 
-**5 · Fire it up**
+**5️⃣ · Fire it up 🎉**
 
 ```bash
 # on any issue or PR, as a comment:
@@ -91,6 +107,8 @@ The workflow only answers the repository owner — keep `.github/CODEOWNERS` poi
 Runs queue per issue/PR (no parallel stomping), allow up to ~5.5 h of agent time,
 and post their result back to the same thread.
 
+> 💡 **Tip:** short and specific beats long and vague — `/oc fix test-foo flake` flies.
+
 ---
 
 ## ⚙️ Configuration
@@ -104,9 +122,9 @@ and post their result back to the same thread.
 
 ## 📊 Observability & recovery
 
-- Every run writes a schema-stable record to `docs/oc-runs/<run_id>.json` and uploads it as an artifact (never committed).
-- Native OpenCode sessions are exported, uploaded (90-day artifact), and restored on the next attempt.
-- Session state survives on a dedicated `oc/session-*` branch, so a re-trigger never restarts finished work.
+- 🧾 Every run writes a schema-stable record to `docs/oc-runs/<run_id>.json` and uploads it as an artifact (never committed).
+- 💾 Native OpenCode sessions are exported, uploaded (90-day artifact), and restored on the next attempt.
+- 🌿 Session state survives on a dedicated `oc/session-*` branch, so a re-trigger never restarts finished work.
 
 ---
 
@@ -120,16 +138,18 @@ for t in .github/scripts/test-*.sh; do bash "$t"; done
 
 ## 🧰 Good to know
 
-- `dependabot.yml` keeps GitHub Actions (and npm) dependencies fresh.
-- `pandoc-pdf.yml` renders `docs/pandoc-demo/**` to PDF on push to `main`.
-- Never commit `.env`, tokens, or session credentials — `.gitignore` already blocks the usual suspects.
+- 🤖 `dependabot.yml` keeps GitHub Actions (and npm) dependencies fresh.
+- 📄 `pandoc-pdf.yml` renders `docs/pandoc-demo/**` to PDF on push to `main`.
+- 🚫 Never commit `.env`, tokens, or session credentials — `.gitignore` already blocks the usual suspects.
 
 ---
 
 <div align="center">
 
-🟥 🟧 🟨 🟩 🟦 🟪
+🟥 🟧 🟨 🟩 🟦 🟪 🌈
 
-**Made for people who'd rather talk to their CI than their keyboard.**
+**Made for people who'd rather talk to their CI than their keyboard.** 🐉💬
+
+*Say `/oc` and see what it can do.*
 
 </div>
