@@ -50,6 +50,17 @@ Useful finding: the controller contract is intact.
   "llm.model": "example",
 }
 OC-DONE: The logging change is implemented and the validation checks are green.
+🤖 : Let me explore the repository to understand what this setup contains.
+⚡ Ran command
+✓ bash completed
+📖 Read file
+✎ Edit file
+⌕ Search
+◆ Tool call
+📄 Final response captured
+✗ Error: example failure
+⚠ Warning: example warning
+[OPENCODE] session idle
 EOF
 
 awk -f "$FILTER" "$TMP/input" | sed $'s/\033\[[0-9;]*m//g' > "$TMP/output"
@@ -61,6 +72,16 @@ grep -Fq '• Editing /home/runner/work/SnapDragon/SnapDragon/.github/workflows/
 grep -Fq '→ Running command' "$TMP/output"
 grep -Fq 'Useful finding: the controller contract is intact.' "$TMP/output"
 grep -Fq '✓ The logging change is implemented and the validation checks are green.' "$TMP/output"
+grep -Fq '🤖 : Let me explore the repository to understand what this setup contains.' "$TMP/output"
+grep -Fq '⚡ Ran command' "$TMP/output"
+grep -Fq '✓ bash completed' "$TMP/output"
+grep -Fq '📖 Read file' "$TMP/output"
+grep -Fq '✎ Edit file' "$TMP/output"
+grep -Fq '⌕ Search' "$TMP/output"
+grep -Fq '◆ Tool call' "$TMP/output"
+grep -Fq '📄 Final response captured' "$TMP/output"
+grep -Fq '✗ Error: example failure' "$TMP/output"
+grep -Fq '⚠ Warning: example warning' "$TMP/output"
 
 absent '|  Read ' "$TMP/output"
 absent '|  Shell ' "$TMP/output"
@@ -71,5 +92,8 @@ absent 'llm.runtime' "$TMP/output"
 absent 'tracking {' "$TMP/output"
 absent 'GEMINI' "$TMP/output"
 absent 'COPILOT' "$TMP/output"
+absent '[OPENCODE] session idle' "$TMP/output"
+absent 'Thinking:' "$TMP/output"
+absent '"type":"tool_use"' "$TMP/output"
 
 echo "human-oriented live OpenCode output filter: OK"

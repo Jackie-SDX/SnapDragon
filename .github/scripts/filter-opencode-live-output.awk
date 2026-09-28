@@ -5,6 +5,7 @@
 
 function color(c,s) { return c s "\033[0m" }
 function green(s) { return color("\033[92m",s) }
+function dark_green(s) { return color("\033[32m",s) }
 function cyan(s) { return color("\033[96m",s) }
 function purple(s) { return color("\033[38;5;141m",s) }
 function blue(s) { return color("\033[94m",s) }
@@ -52,6 +53,17 @@ BEGIN {
 {
   line=clean_line($0)
 
+  if (line ~ /^🤖[[:space:]]*:/) { emit(purple(line)); suppress_command_output=0; next }
+  if (line ~ /^⚡[[:space:]]*Ran command/) { emit(dark_green(line)); suppress_command_output=0; next }
+  if (line ~ /^✓[[:space:]]*(bash|shell|read|Read|edit|Edit|write|Write|patch|Patch|grep|Grep|glob|Glob|websearch|WebSearch|webfetch|WebFetch|search)[[:space:]]+completed/) { emit(green(line)); suppress_command_output=0; next }
+  if (line ~ /^📖[[:space:]]*Read file/) { emit(cyan(line)); suppress_command_output=0; next }
+  if (line ~ /^✎[[:space:]]*Edit file/) { emit(purple(line)); suppress_command_output=0; next }
+  if (line ~ /^⌕[[:space:]]*Search/) { emit(blue(line)); suppress_command_output=0; next }
+  if (line ~ /^◆[[:space:]]*Tool call/) { emit(cyan(line)); suppress_command_output=0; next }
+  if (line ~ /^📄[[:space:]]*Final response captured/) { emit(green(line)); suppress_command_output=0; next }
+  if (line ~ /^✗[[:space:]]*Error:/) { emit(red(line)); suppress_command_output=0; next }
+  if (line ~ /^⚠[[:space:]]*Warning:/) { emit(bright_orange(line)); suppress_command_output=0; next }
+  if (line ~ /^\[OPENCODE\][[:space:]]+(session started|session idle|tool|edited)/) { next }
   if (line ~ /^Thinking:[[:space:]]*/) { emit(purple("◆ " line)); suppress_command_output=0; next }
 
   if (line ~ /OC-STATUS:[[:space:]]*/) { msg=status_text(line,"^.*OC-STATUS:[[:space:]]*"); if(msg!="") emit(green("▶ " msg)); suppress_command_output=0; next }

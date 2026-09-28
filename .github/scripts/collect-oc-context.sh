@@ -193,6 +193,32 @@ else
 fi
 
 full_size="$(wc -c < "$full")"
+if ! [[ "$seed_bytes" =~ ^[0-9]+$ ]] || (( seed_bytes < 4096 )); then
+  seed_bytes=60000
+fi
+seed_prefix=12000
+if (( seed_prefix >= seed_bytes )); then
+  seed_prefix=$((seed_bytes / 3))
+fi
+seed_tail=$((seed_bytes - seed_prefix))
+{
+  echo "## Current /oc request"
+  cat "$request_file" 2>/dev/null || true
+  echo
+  echo "## Bounded historical context"
+  if (( full_size <= seed_bytes )); then
+    cat "$full"
+  else
+    head -c "$seed_prefix" "$full"
+    printf '
+
+...[middle of context elided; recent comments and CI follow]...
+
+'
+    tail -c "$seed_tail" "$full"
+  fi
+} > "$seed"
+
 {
   printf "OC_ISSUE_CONTEXT_FILE=%s\n" "$full"
   printf "OC_ISSUE_CONTEXT_SEED_FILE=%s\n" "$seed"

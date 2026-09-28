@@ -62,9 +62,13 @@ set -e
 [[ "$rc" == "0" ]] || { echo "collect context regression failed rc=$rc"; cat "$tmp/collect-log"; exit 1; }
 grep -Fq 'On-demand /oc context collected:' "$tmp/collect-log"
 context_file="$(sed -n 's/^OC_ISSUE_CONTEXT_FILE=//p' "$out")"
+seed_file="$(sed -n 's/^OC_ISSUE_CONTEXT_SEED_FILE=//p' "$out")"
 refs_file="$(sed -n 's/^OC_REFERENCE_CONTEXT_FILE=//p' "$out")"
 test -s "$context_file"
+test -s "$seed_file"
 test -s "$refs_file"
+grep -Fq '## Current /oc request' "$seed_file"
+grep -Fq 'Remote context regression' "$context_file"
 grep -Fq 'Referenced GitHub item: https://github.com/MangaD/cpp-project-template/issues/7' "$refs_file"
 grep -Fq 'Referenced issue' "$refs_file"
 echo 'remote-target context capture regression: OK'
