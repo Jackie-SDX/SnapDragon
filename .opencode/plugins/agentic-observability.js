@@ -28,7 +28,7 @@ export const AgenticObservability = async () => {
   return {
     event: async ({ event }) => {
       try {
-        if (event.type === "session.created") emit("session started")
+        if (event.type === "session.created") {}
         else if (event.type === "message.updated") {
           const info = event.properties?.info
           if (info?.role === "assistant" && info?.id) assistantMessageIds.add(info.id)
@@ -39,14 +39,13 @@ export const AgenticObservability = async () => {
             else if (typeof event.properties?.delta === "string" && event.properties.delta) latestAssistantText += event.properties.delta
           }
         } else if (event.type === "session.error") emit("ERROR " + safe(event.properties?.error ?? event.error))
-        else if (event.type === "file.edited") emit("edited " + safe(event.properties?.path ?? event.path))
-        else if (event.type === "tool.execute.before") emit("tool -> " + toolName(event.properties?.tool ?? event.tool))
-        else if (event.type === "tool.execute.after") emit("tool ok " + toolName(event.properties?.tool ?? event.tool))
+        else if (event.type === "file.edited") {}
+        else if (event.type === "tool.execute.before") {}
+        else if (event.type === "tool.execute.after") {}
         else if (event.type === "todo.updated") emit("plan updated")
         else if (event.type === "session.compacted") emit("session compacted; continuing with preserved context")
         else if (event.type === "session.idle") {
           persistFinalResponse()
-          emit("session idle")
         }
       } catch (_) {}
     },

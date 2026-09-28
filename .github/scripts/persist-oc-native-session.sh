@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo="$(printenv GITHUB_REPOSITORY || true)"
-token="$(printenv UNIVERSAL_TOKEN || true)"
+token="$(printenv GITHUB_TOKEN || true)"
+[[ -n "$token" ]] || token="$(printenv GH_TOKEN || true)"
+[[ -n "$token" ]] || token="$(printenv UNIVERSAL_TOKEN || true)"
 target="$(printenv TARGET_NUMBER || printf 0)"
 session_id="$(printenv NATIVE_SESSION_ID || true)"
 export_file="$(printenv NATIVE_SESSION_EXPORT_FILE || true)"

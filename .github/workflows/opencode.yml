@@ -51,8 +51,8 @@ jobs:
       statuses: read
     env:
       UNIVERSAL_TOKEN: ${{ secrets.UNIVERSAL_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
-      GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
       OPENCODE_AGENT_TIMEOUT_MINUTES: "330"
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
@@ -97,6 +97,20 @@ jobs:
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
           BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
         run: bash .github/scripts/prepare-oc-session.sh
+
+
+      - name: Collect bounded /oc context
+        id: context
+        continue-on-error: true
+        shell: bash
+        env:
+          TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$COMMENT_BODY" > "$RUNNER_TEMP/oc-request.txt"
+          OC_REQUEST_FILE="$RUNNER_TEMP/oc-request.txt"           OC_TARGET_REPO="$GITHUB_REPOSITORY"           OC_TARGET_BASE="$BASE_REF"           OC_TARGET_BRANCH="$(printenv OC_SESSION_BRANCH || true)"           bash .github/scripts/collect-oc-context.sh
 
 
       - name: Resolve and verify OpenCode release
@@ -163,7 +177,7 @@ jobs:
         continue-on-error: true
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           restore_dir="$RUNNER_TEMP/opencode-native-session-restore"
@@ -218,7 +232,7 @@ jobs:
         if: always() && (steps.attempt_1.outputs.termination_reason == 'timeout' || steps.attempt_1.outputs.timed_out == 'true')
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
           BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
           OPENCODE_AGENT_TIMEOUT_MINUTES: "330"
