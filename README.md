@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/snapdragon-banner.gif" alt="🐉 SnapDragon — the chat-driven CI agent" width="100%">
+
 # 🐉✨ SnapDragon ✨🐉
 
 ### *The GitHub-native [OpenCode](https://opencode.ai) agent that lives inside your repo*
@@ -16,10 +18,13 @@ straight from GitHub Actions, with durable sessions and automatic recovery. 🚀
 ![sessions](https://img.shields.io/badge/sessions-durable%20💤%20resumable-ff69b4?style=flat-square)
 ![safety](https://img.shields.io/badge/safety-secrets%20redacted%20🔒-2ea44f?style=flat-square)
 ![speed](https://img.shields.io/badge/speed-cached%20%26%20verified%20⚡-d97706?style=flat-square)
+![tests](https://img.shields.io/badge/tests-batteries%20included%20🧪-2ea44f?style=flat-square)
+![party](https://img.shields.io/badge/party-mode-ON%20🎉-8A2BE2?style=flat-square)
 
-🟥 🟧 🟨 🟩 🟦 🟪 🌈
+🟥 🟧 🟨 🟩 🟦 🟪 🌈 🎆 🌈 🟪 🟦 🟩 🟨 🟧 🟥
 
 **[Quick start](#-quick-start-5-steps)** •
+**[How it flows](#-how-a-run-flows)** •
 **[Commands](#-commands)** •
 **[Config](#%EF%B8%8F-configuration)** •
 **[Verify](#-verify-a-checkout)**
@@ -29,7 +34,7 @@ straight from GitHub Actions, with durable sessions and automatic recovery. 🚀
 ---
 
 > ### 🎤 “Talk to your CI like you'd text a friend.”
-> One comment in, one full report out — plans, edits, tests, evidence.
+> One comment in, one full report out — plans, edits, tests, evidence. 🐉💬
 
 ---
 
@@ -41,13 +46,37 @@ straight from GitHub Actions, with durable sessions and automatic recovery. 🚀
 - ⚡ **Fast & verified** — OpenCode installs from a sha256-verified release and is cached daily.
 - 📈 **Fully observable** — live log stream, machine-readable run records, session artifacts.
 - 🎁 **Batteries included** — cache warmer, PDF exporter and Dependabot ship in the box.
+- 🌍 **Anywhere** — works on issues *and* PRs, queued per thread, results posted back in place.
+
+---
+
+## 🎬 How a run flows
+
+```mermaid
+flowchart LR
+    A["💬 /oc comment"]:::pink --> B["🎯 GitHub Actions"]:::orange
+    B --> C["🧠 OpenCode agent"]:::purple
+    C --> D{"🧪 tests pass?"}:::blue
+    D -- "✅ yes" --> E["📣 report in the thread"]:::green
+    D -- "❌ no" --> F["🔧 patch on oc/session-*"]:::red
+    F --> C
+    E --> G["💾 session artifact + run record"]:::teal
+
+    classDef pink   fill:#ff69b4,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef orange fill:#f97316,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef purple fill:#8A2BE2,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef blue   fill:#2563eb,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef green  fill:#22c55e,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef red    fill:#ef4444,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef teal   fill:#14b8a6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+```
 
 ---
 
 ## 🗂️ What's in the box
 
 ```text
-opencode.json                     # model, agent, MCP bridge, permissions
+opencode.json                     # 🐉 model, agent, MCP bridge, permissions
 .opencode/
 ├── instructions.md               # 📜 the operator contract the agent follows
 ├── plugins/agentic-observability.js  # 📡 live event stream + secret redaction
@@ -58,7 +87,10 @@ opencode.json                     # model, agent, MCP bridge, permissions
 ├── workflows/pandoc-pdf.yml      # 🎁 bonus: Markdown → PDF via Pandoc
 ├── actions/oc-attempt/           # 🧪 one full agent attempt
 └── scripts/                      # 🛠️ session state, context, publish, recovery
-docs/                             # 📚 run-record + demo docs
+docs/
+├── assets/                       # 🎨 banner art for this README
+├── oc-runs/                      # 📈 run records (uploaded, never committed)
+└── pandoc-demo/                  # 📄 PDF demo source
 ```
 
 ---
@@ -146,10 +178,12 @@ for t in .github/scripts/test-*.sh; do bash "$t"; done
 
 <div align="center">
 
-🟥 🟧 🟨 🟩 🟦 🟪 🌈
+🟥 🟧 🟨 🟩 🟦 🟪 🌈 🎆 🌈 🟪 🟦 🟩 🟨 🟧 🟥
 
 **Made for people who'd rather talk to their CI than their keyboard.** 🐉💬
 
-*Say `/oc` and see what it can do.*
+*Say `/oc` and see what it can do.* 🎉
+
+<img src="docs/assets/snapdragon-banner.gif" alt="SnapDragon banner" width="100%">
 
 </div>
