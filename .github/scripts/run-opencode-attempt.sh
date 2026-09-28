@@ -73,6 +73,7 @@ target_number="$(printenv TARGET_NUMBER 2>/dev/null || printf 0)"
 native_session_id_file="$runner_temp/opencode-$attempt-native-session-id"
 native_archive_branch="oc-native-session-$target_number"
 native_archive_path="session.json.enc"
+native_archive_commit_file="$runner_temp/opencode-$attempt-native-archive-commit"
 : > "$safe_log"
 : > "$progress_log"
 : > "$native_session_id_file"
@@ -329,7 +330,7 @@ heartbeat() {
         snapshot="$runner_temp/opencode-native-session-live-$target_number.json"
         if (cd "$agent_cwd" && timeout 60s opencode export "$sid" > "$snapshot.tmp" 2>/dev/null) && [[ -s "$snapshot.tmp" ]]; then
           mv -f "$snapshot.tmp" "$snapshot"
-          NATIVE_SESSION_ID="$sid" NATIVE_SESSION_EXPORT_FILE="$snapshot" OC_NATIVE_ARCHIVE_BRANCH="$native_archive_branch" OC_NATIVE_ARCHIVE_PATH="$native_archive_path" bash "$controller_root/.github/scripts/persist-oc-native-session.sh" || true
+          NATIVE_SESSION_ID="$sid" NATIVE_SESSION_EXPORT_FILE="$snapshot" OC_NATIVE_ARCHIVE_BRANCH="$native_archive_branch" OC_NATIVE_ARCHIVE_PATH="$native_archive_path" OC_NATIVE_ARCHIVE_COMMIT_FILE="$native_archive_commit_file" bash "$controller_root/.github/scripts/persist-oc-native-session.sh" || true
           native_session_id="$sid"; native_session_export_file="$snapshot"; last_native_export="$elapsed"
         else
           rm -f "$snapshot.tmp"
@@ -482,7 +483,7 @@ if [[ "$native_session_id" =~ ^ses_[A-Za-z0-9_-]+$ && -n "$agent_cwd" && -d "$ag
   native_session_artifact="opencode-native-session-$target_number-$native_session_id"
   if (cd "$agent_cwd" && opencode export "$native_session_id" > "$native_session_export_file" 2>/dev/null) && [[ -s "$native_session_export_file" ]]; then
     persist_rc=0
-    NATIVE_SESSION_ID="$native_session_id" NATIVE_SESSION_EXPORT_FILE="$native_session_export_file" OC_NATIVE_ARCHIVE_BRANCH="$native_archive_branch" OC_NATIVE_ARCHIVE_PATH="$native_archive_path" bash "$controller_root/.github/scripts/persist-oc-native-session.sh" || persist_rc=$?
+    NATIVE_SESSION_ID="$native_session_id" NATIVE_SESSION_EXPORT_FILE="$native_session_export_file" OC_NATIVE_ARCHIVE_BRANCH="$native_archive_branch" OC_NATIVE_ARCHIVE_PATH="$native_archive_path" OC_NATIVE_ARCHIVE_COMMIT_FILE="$native_archive_commit_file" bash "$controller_root/.github/scripts/persist-oc-native-session.sh" || persist_rc=$?
     if [[ "$persist_rc" -eq 0 ]]; then
       printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
       printf "native_session_export_file=%s\n" "$native_session_export_file" >> "$output_file"

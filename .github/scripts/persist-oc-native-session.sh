@@ -7,6 +7,7 @@ session_id="$(printenv NATIVE_SESSION_ID || true)"
 export_file="$(printenv NATIVE_SESSION_EXPORT_FILE || true)"
 branch="$(printenv OC_NATIVE_ARCHIVE_BRANCH || printf 'oc-native-session-')$target"
 path="$(printenv OC_NATIVE_ARCHIVE_PATH || printf 'session.json.enc')"
+archive_commit_file="$(printenv OC_NATIVE_ARCHIVE_COMMIT_FILE || true)"
 runner_temp="$(printenv RUNNER_TEMP || printf /tmp)"
 [[ "$target" =~ ^[0-9]+$ && "$target" != 0 ]] || exit 0
 [[ "$session_id" =~ ^ses_[A-Za-z0-9_-]+$ ]] || exit 2
@@ -46,3 +47,4 @@ printf 'OC_NATIVE_SESSION_EXPORTED=true\n' >> "$GITHUB_ENV"
 printf 'native_session_archive_branch=%s\n' "$branch" >> "$GITHUB_OUTPUT"
 printf 'native_session_archive_path=%s\n' "$path" >> "$GITHUB_OUTPUT"
 printf 'native_session_archive_commit=%s\n' "$commit_sha" >> "$GITHUB_OUTPUT"
+if [[ -n "$archive_commit_file" ]]; then printf '%s\n' "$commit_sha" > "$archive_commit_file"; fi
