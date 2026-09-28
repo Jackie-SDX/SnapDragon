@@ -111,8 +111,14 @@ set_base() {
 }
 
 i=0
+force_new=0
 while (( i < ${#tokens[@]} )); do
   tok="${tokens[$i]}"
+  if [[ "$tok" == "--new" ]]; then
+    force_new=1
+    i=$((i + 1))
+    continue
+  fi
   case "$tok" in
     repo=*|repository=*|target=*)
       if ! set_target "${tok#*=}"; then
@@ -169,6 +175,27 @@ done
 
 task="$(printf '%s' "${kept[*]:-}" | sed -e 's/  */ /g' -e 's/^[[:space:]]//' -e 's/[[:space:]]$//')"
 
+# Ordinary /oc requests with an existing durable session recover its stored
+# target repository/base/branch automatically. --new deliberately bypasses this.
+if [[ "$mode" == "local" && "$force_new" != "1" ]]; then
+  session_state_file="${OC_SESSION_STATE_FILE:-${RUNNER_TEMP:-/tmp}/oc-session-state.json}"
+  OC_SESSION_STATE_FILE="$session_state_file" bash .github/scripts/oc-session-state.sh load >/dev/null 2>&1 || true
+  session_repo="$(jq -r .target_repository "$session_state_file" 2>/dev/null || true)"
+  session_base="$(jq -r ".target_base // .base_ref // \"main\"" "$session_state_file" 2>/dev/null || true)"
+  session_branch="$(jq -r ".target_branch // .active_branch // \"\"" "$session_state_file" 2>/dev/null || true)"
+  if valid_repo "$session_repo" && valid_ref "$session_base" && { [[ -z "$session_branch" ]] || valid_ref "$session_branch"; }; then
+    if [[ "$session_repo" != "$controller_repo" ]]; then
+      target_repo="$session_repo"
+      target_base="$session_base"
+      target_branch="$session_branch"
+      mode="remote"
+      resume="1"
+      from_marker="1"
+      target_source="session-memory"
+      echo "Recovered durable session target: $target_repo@$target_base"
+    fi
+  fi
+fi
 # /oc continue without an explicit target: recover the durable marker left by
 # the previous timed-out remote run instead of starting duplicate work.
 if [[ "$mode" == "local" && "$raw_task" =~ ^continue([[:space:]]|$) ]]; then
@@ -253,6 +280,7 @@ if [[ "$mode" == "remote" ]]; then
   emit_env OC_TARGET_BRANCH "$target_branch"
   emit_env OC_TARGET_RESUME "$resume"
   emit_env OC_TARGET_FROM_MARKER "$from_marker"
+  emit_env OC_TARGET_NEW_REQUEST "$force_new"
   emit_env OC_TARGET_TASK "$task"
   # Remote targets are always published and verified by controller-owned logic.
 fi
@@ -264,6 +292,7 @@ emit_out target_base "$target_base"
 emit_out target_branch "$target_branch"
 emit_out resume "$resume"
 emit_out from_marker "$from_marker"
+emit_out new_request "$force_new"
 
 if [[ "$mode" == "remote" ]]; then
   echo "Remote-target mode selected: $target_repo (base=$target_base${target_branch:+ branch=$target_branch})"
