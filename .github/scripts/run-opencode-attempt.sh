@@ -69,8 +69,13 @@ native_restore_file="${OC_NATIVE_SESSION_EXPORT_FILE:-}"
 native_session_artifact=""
 native_session_export_file=""
 native_session_restored=false
+target_number="$(printenv TARGET_NUMBER 2>/dev/null || printf 0)"
+native_session_id_file="$runner_temp/opencode-$attempt-native-session-id"
+native_archive_branch="oc-native-session-$target_number"
+native_archive_path="session.json.enc"
 : > "$safe_log"
 : > "$progress_log"
+: > "$native_session_id_file"
 
 
 checkpoint_worktree() {
@@ -180,6 +185,7 @@ fi
     native_session_id=""
     return 0
   fi
+  printf '%s\n' "$native_session_id" > "$native_session_id_file"
   echo "[OC][attempt=$attempt] importing native OpenCode session $native_session_id"
   if (cd "$agent_cwd" && opencode import "$native_restore_file" >/dev/null 2>&1); then
     native_session_restored=true
@@ -311,12 +317,25 @@ checkpoint_session_state() {
 }
 
 heartbeat() {
-  local elapsed next_checkpoint=300
+  local elapsed next_checkpoint=300 last_native_export=0 sid snapshot
   while kill -0 "$agent_pid" 2>/dev/null; do
     sleep "$heartbeat_interval"
     kill -0 "$agent_pid" 2>/dev/null || break
     elapsed=$(( $(date +%s) - start_epoch ))
     printf "[OC][attempt=%s][elapsed=%ss] heartbeat state=running\n" "$attempt" "$elapsed" >> "$progress_log"
+    sid="$(cat "$native_session_id_file" 2>/dev/null || true)"
+    if [[ -n "$sid" && "$sid" =~ ^ses_[A-Za-z0-9_-]+$ && -n "$agent_cwd" && -d "$agent_cwd" ]]; then
+      if (( elapsed - last_native_export >= 300 )); then
+        snapshot="$runner_temp/opencode-native-session-live-$target_number.json"
+        if (cd "$agent_cwd" && timeout 60s opencode export "$sid" > "$snapshot.tmp" 2>/dev/null) && [[ -s "$snapshot.tmp" ]]; then
+          mv -f "$snapshot.tmp" "$snapshot"
+          NATIVE_SESSION_ID="$sid" NATIVE_SESSION_EXPORT_FILE="$snapshot" OC_NATIVE_ARCHIVE_BRANCH="$native_archive_branch" OC_NATIVE_ARCHIVE_PATH="$native_archive_path" bash "$controller_root/.github/scripts/persist-oc-native-session.sh" || true
+          native_session_id="$sid"; native_session_export_file="$snapshot"; last_native_export="$elapsed"
+        else
+          rm -f "$snapshot.tmp"
+        fi
+      fi
+    fi
     if (( elapsed >= next_checkpoint )); then
       checkpoint_worktree
       checkpoint_session_state "$elapsed"
@@ -348,6 +367,7 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     event_session_id="$(jq -r '.sessionID // empty' <<<"$raw_line")"
     if [[ "$event_session_id" =~ ^ses_[A-Za-z0-9_-]+$ ]]; then
       native_session_id="$event_session_id"
+      printf '%s\n' "$native_session_id" > "$native_session_id_file"
     fi
     event_type="$(jq -r '.type // empty' <<<"$raw_line")"
     case "$event_type" in
@@ -399,7 +419,7 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     safe_line="$(sanitize_line "$raw_line")"
     printf "%s\n" "$safe_line"
   fi
-done < "$fifo" | awk -f "$script_dir/filter-opencode-live-output.awk" | tee -a "$safe_log"
+done < <(awk -f "$script_dir/filter-opencode-live-output.awk" "$fifo" | tee -a "$safe_log")
 wait "$agent_pid"
 exit_code=$?
 
@@ -458,35 +478,31 @@ printf "[OC][attempt=%s][elapsed=%ss] finished exit_code=%s termination_reason=%
 printf "[OC][LIVE] OpenCode session finished; final result is being reconciled.\n" | tee -a "$progress_log"
 
 if [[ "$native_session_id" =~ ^ses_[A-Za-z0-9_-]+$ && -n "$agent_cwd" && -d "$agent_cwd" ]]; then
-  native_session_export_file="$runner_temp/opencode-native-session-${attempt}-${TARGET_NUMBER:-0}.json"
-  native_session_artifact="opencode-native-session-${TARGET_NUMBER:-0}-${native_session_id}"
+  native_session_export_file="$runner_temp/opencode-native-session-$attempt-$target_number.json"
+  native_session_artifact="opencode-native-session-$target_number-$native_session_id"
   if (cd "$agent_cwd" && opencode export "$native_session_id" > "$native_session_export_file" 2>/dev/null) && [[ -s "$native_session_export_file" ]]; then
-    printf "native_session_id=\n" >> "$output_file"
-    printf "native_session_export_file=%s\n" "$native_session_export_file" >> "$output_file"
-    printf "native_session_artifact=%s\n" "$native_session_artifact" >> "$output_file"
-    printf "OC_NATIVE_SESSION_ID=%s\n" "$native_session_id" >> "${GITHUB_ENV:-/dev/null}"
-    printf "OC_NATIVE_SESSION_RUN_ID=%s\n" "${GITHUB_RUN_ID:-}" >> "${GITHUB_ENV:-/dev/null}"
-    printf "OC_NATIVE_SESSION_ARTIFACT=%s\n" "$native_session_artifact" >> "${GITHUB_ENV:-/dev/null}"
-    printf "OC_NATIVE_SESSION_EXPORTED=true\n" >> "${GITHUB_ENV:-/dev/null}"
-    echo "[OC][attempt=$attempt] native session exported: $native_session_id"
+    persist_rc=0
+    NATIVE_SESSION_ID="$native_session_id" NATIVE_SESSION_EXPORT_FILE="$native_session_export_file" OC_NATIVE_ARCHIVE_BRANCH="$native_archive_branch" OC_NATIVE_ARCHIVE_PATH="$native_archive_path" bash "$controller_root/.github/scripts/persist-oc-native-session.sh" || persist_rc=$?
+    if [[ "$persist_rc" -eq 0 ]]; then
+      printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
+      printf "native_session_export_file=%s\n" "$native_session_export_file" >> "$output_file"
+      printf "native_session_artifact=%s\n" "$native_session_artifact" >> "$output_file"
+      printf "OC_NATIVE_SESSION_ID=%s\n" "$native_session_id" >> "$GITHUB_ENV"
+      printf "OC_NATIVE_SESSION_RUN_ID=%s\n" "$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+      printf "OC_NATIVE_SESSION_ARTIFACT=%s\n" "$native_session_artifact" >> "$GITHUB_ENV"
+      printf "OC_NATIVE_SESSION_EXPORTED=true\n" >> "$GITHUB_ENV"
+    else
+      printf "native_session_id=\n" >> "$output_file"
+      printf "native_session_export_file=\n" >> "$output_file"
+      printf "native_session_artifact=\n" >> "$output_file"
+    fi
   else
-    echo "::warning title=Native OpenCode session export failed::Durable logical state remains available."
-    printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
+    printf "native_session_id=\n" >> "$output_file"
     printf "native_session_export_file=\n" >> "$output_file"
     printf "native_session_artifact=\n" >> "$output_file"
   fi
 else
-  printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
+  printf "native_session_id=\n" >> "$output_file"
   printf "native_session_export_file=\n" >> "$output_file"
   printf "native_session_artifact=\n" >> "$output_file"
 fi
-
-{
-  printf "exit_code=%s\n" "$exit_code"
-  printf "termination_reason=%s\n" "$termination_reason"
-  printf "provider_warning=%s\n" "$provider_warning"
-} >> "$output_file"
-
-echo "[OC][attempt=${attempt}] live stream complete; exit_code=${exit_code}; termination_reason=${termination_reason}"
-if [ "$clarification_required" = "true" ]; then exit 0; fi
-exit "$exit_code"

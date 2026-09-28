@@ -203,6 +203,12 @@ jobs:
           echo "OC_NATIVE_SESSION_EXPORT_FILE=$export_file" >> "$GITHUB_ENV"
           echo "Recovered native OpenCode session artifact for $OC_NATIVE_SESSION_ID"
 
+      - name: Restore durable native OpenCode session snapshot
+        if: env.OC_NATIVE_SESSION_ID != '' && env.OC_NATIVE_SESSION_ARCHIVE_BRANCH != ''
+        continue-on-error: true
+        shell: bash
+        run: bash .github/scripts/restore-oc-native-session.sh
+
       - name: Prepare remote target workspace
         if: env.OC_TASK_MODE != 'merge' && steps.target.outputs.mode == 'remote'
         shell: bash

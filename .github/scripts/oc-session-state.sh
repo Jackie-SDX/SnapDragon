@@ -86,6 +86,9 @@ export_state(){
   emit_env OC_NATIVE_SESSION_RUN_ID "$(jq -r '.native_session_run_id // ""' "$state_file")"
   emit_env OC_NATIVE_SESSION_ARTIFACT "$(jq -r '.native_session_artifact // ""' "$state_file")"
   emit_env OC_NATIVE_SESSION_EXPORTED "$(jq -r '.native_session_exported // false' "$state_file")"
+  emit_env OC_NATIVE_SESSION_ARCHIVE_BRANCH "$(jq -r '.native_session_archive_branch // ""' "$state_file")"
+  emit_env OC_NATIVE_SESSION_ARCHIVE_PATH "$(jq -r '.native_session_archive_path // ""' "$state_file")"
+  emit_env OC_NATIVE_SESSION_ARCHIVE_COMMIT "$(jq -r '.native_session_archive_commit // ""' "$state_file")"
   emit_env OC_SESSION_EXISTS true
   emit_out state_file "$state_file"
   emit_out session_id "$(jq -r '.session_id // ""' "$state_file")"
@@ -151,6 +154,9 @@ case "$cmd" in
   "native_session_run_id":null,
   "native_session_artifact":"",
   "native_session_exported":false,
+  "native_session_archive_branch":"",
+  "native_session_archive_path":"",
+  "native_session_archive_commit":"",
   "last_checkpoint_at":"$now"
 }
 EOF
@@ -212,6 +218,7 @@ EOF
       durable_work:false,target_repository:"",target_base:$base,target_branch:"",
       last_run_id:null,agent_attempt:null,termination_reason:null,
       native_session_id:"",native_session_run_id:null,native_session_artifact:"",native_session_exported:false,
+      native_session_archive_branch:"",native_session_archive_path:"",native_session_archive_commit:"",
       last_checkpoint_at:$now
     }')"
     export_state "$json"
