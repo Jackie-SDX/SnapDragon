@@ -20,13 +20,14 @@ command -v mkfifo >/dev/null 2>&1 || { echo "::error title=Missing mkfifo utilit
 safe_log="$runner_temp/opencode-$attempt-safe.log"
 progress_log="$runner_temp/opencode-$attempt-progress.log"
 fifo="$runner_temp/opencode-$attempt.fifo"
+display_fifo="$runner_temp/opencode-$attempt-display.fifo"
 final_response_file="$runner_temp/opencode-final-response-$attempt.md"
 native_session_id_file="$runner_temp/opencode-$attempt-native-session-id"
 native_archive_branch="oc-native-session-${TARGET_NUMBER:-0}"
 native_archive_path="session.json.enc"
 native_archive_commit_file="$runner_temp/opencode-$attempt-native-archive-commit"
 
-rm -f "$safe_log" "$progress_log" "$fifo" "$final_response_file" "$native_session_id_file"
+rm -f "$safe_log" "$progress_log" "$fifo" "$display_fifo" "$final_response_file" "$native_session_id_file"
 : > "$native_session_id_file"
 printf 'OC_FINAL_RESPONSE_FILE=%s\n' "$final_response_file" >> "$GITHUB_ENV"
 printf 'OC_FINAL_RESPONSE_FILE=%s\n' "$final_response_file"
@@ -43,7 +44,7 @@ native_session_artifact=""
 request="$(printenv OC_COMMAND_TEXT 2>/dev/null || true)"
 event_path="$(printenv GITHUB_EVENT_PATH 2>/dev/null || true)"
 if [[ -z "$request" && -f "$event_path" ]]; then
-  request="$(jq -r '.comment.body // empty' "$event_path" 2>/dev/null | sed -E 's#^/(oc|opencode)[[:space:]]*##')"
+  request="$(jq -r '.comment.body // empty' "$event_path" 2>/dev/null | sed -E 's#^/(oc|opencode)[[:space:][:punct:]]*##')"
 fi
 [[ -n "$request" ]] || request="Execute the user's latest request."
 
@@ -57,7 +58,8 @@ cleanup() {
     bash "$controller_root/.github/scripts/checkpoint-oc-working-tree.sh" "$agent_worktree" || true
     git -C "$controller_root" worktree remove --force "$agent_worktree" >/dev/null 2>&1 || true
   }
-  rm -f "$fifo"
+  [[ -n "${filter_pid:-}" ]] && kill "$filter_pid" 2>/dev/null || true
+  rm -f "$fifo" "$display_fifo"
 }
 trap cleanup EXIT
 
@@ -122,6 +124,7 @@ fi
 start_epoch="$(date +%s)"
 echo "[OC][attempt=$attempt] started route=$model_name" | tee -a "$progress_log"
 mkfifo "$fifo"
+mkfifo "$display_fifo"
 
 checkpoint_session_state() {
   local elapsed="$1" branch="" head="" dirty="false" durable="false"
@@ -165,6 +168,9 @@ heartbeat() {
 
 pushd "$agent_cwd" >/dev/null || exit 2
 printf '%s\n' '[OC][LIVE] OpenCode session started; streaming safe activity summaries and tool actions.' | tee -a "$progress_log"
+awk -f "$(dirname "${BASH_SOURCE[0]}")/filter-opencode-live-output.awk" <"$display_fifo" | tee -a "$safe_log" &
+filter_pid=$!
+exec 3>"$display_fifo"
 timeout --signal=TERM --kill-after=60s "${effective_timeout_seconds}s" "${agent_cmd[@]}" < <(printf '%s\n' "$request") >"$fifo" 2>&1 &
 agent_pid=$!
 popd >/dev/null
@@ -173,6 +179,8 @@ heartbeat &
 heartbeat_pid=$!
 
 while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+  safe_line="$(sanitize_line "$raw_line")"
+  printf '%s\n' "$safe_line" >&3 || true
   if jq -e . >/dev/null 2>&1 <<<"$raw_line"; then
     event_session_id="$(jq -r '.sessionID // empty' <<<"$raw_line")"
     if [[ "$event_session_id" =~ ^ses_[A-Za-z0-9_-]+$ ]]; then
@@ -209,7 +217,9 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
   else
     printf '%s\n' "$(sanitize_line "$raw_line")"
   fi
-done < <(awk -f "$(dirname "${BASH_SOURCE[0]}")/filter-opencode-live-output.awk" "$fifo" | tee -a "$safe_log")
+done <"$fifo"
+exec 3>&-
+wait "$filter_pid" 2>/dev/null || true
 
 wait "$agent_pid"
 exit_code=$?

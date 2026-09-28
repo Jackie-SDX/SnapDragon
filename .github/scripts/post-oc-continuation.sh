@@ -6,14 +6,6 @@ base_ref="$BASE_REF"
 repo="$GITHUB_REPOSITORY"
 [[ "$target" =~ ^[0-9]+$ && "$target" != "0" ]] || exit 0
 
-# Single source of truth for control-plane defaults (see oc-control-plane-config.sh).
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$script_dir/oc-control-plane-config.sh" ]]; then
-  source "$script_dir/oc-control-plane-config.sh"
-else
-  OC_CONTROL_PLANE_AGENT_TIMEOUT_MINUTES=330
-fi
-
 state_file="${OC_SESSION_STATE_FILE:-${RUNNER_TEMP:-/tmp}/oc-session-state.json}"
 branch="$(jq -r '.target_branch // .active_branch // empty' "$state_file" 2>/dev/null || true)"
 sha="$(jq -r '.active_head_sha // .last_verified_sha // empty' "$state_file" 2>/dev/null || true)"

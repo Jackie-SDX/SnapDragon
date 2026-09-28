@@ -15,12 +15,6 @@ inputs:
     default: main
   initial_sha:
     required: true
-  mode:
-    required: false
-    default: local
-  task_mode:
-    required: false
-    default: code
 outputs:
   agent_outcome:
     value: ${{ steps.run.outputs.agent_outcome }}
@@ -49,9 +43,7 @@ runs:
       env:
         ATTEMPT: ${{ inputs.attempt }}
         MODEL: ${{ inputs.model }}
-        OC_TARGET_MODE: ${{ inputs.mode }}
-        TASK_MODE: ${{ inputs.task_mode }}
         TARGET_NUMBER: ${{ inputs.target_number }}
         BASE_REF: ${{ inputs.base_ref }}
         INITIAL_SHA: ${{ inputs.initial_sha }}
-      run: bash .github/scripts/run-attempt-pipeline.sh
+      run: bash .github/scripts/run-opencode-attempt.sh "${ATTEMPT}"
