@@ -456,6 +456,31 @@ fi
 printf "[OC][attempt=%s][elapsed=%ss] finished exit_code=%s termination_reason=%s\n" "$attempt" "$elapsed" "$exit_code" "$termination_reason" | tee -a "$progress_log"
 
 printf "[OC][LIVE] OpenCode session finished; final result is being reconciled.\n" | tee -a "$progress_log"
+
+if [[ "$native_session_id" =~ ^ses_[A-Za-z0-9_-]+$ && -n "$agent_cwd" && -d "$agent_cwd" ]]; then
+  native_session_export_file="$runner_temp/opencode-native-session-${attempt}-${TARGET_NUMBER:-0}.json"
+  native_session_artifact="opencode-native-session-${TARGET_NUMBER:-0}-${native_session_id}"
+  if (cd "$agent_cwd" && opencode export "$native_session_id" > "$native_session_export_file" 2>/dev/null) && [[ -s "$native_session_export_file" ]]; then
+    printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
+    printf "native_session_export_file=%s\n" "$native_session_export_file" >> "$output_file"
+    printf "native_session_artifact=%s\n" "$native_session_artifact" >> "$output_file"
+    printf "OC_NATIVE_SESSION_ID=%s\n" "$native_session_id" >> "${GITHUB_ENV:-/dev/null}"
+    printf "OC_NATIVE_SESSION_RUN_ID=%s\n" "${GITHUB_RUN_ID:-}" >> "${GITHUB_ENV:-/dev/null}"
+    printf "OC_NATIVE_SESSION_ARTIFACT=%s\n" "$native_session_artifact" >> "${GITHUB_ENV:-/dev/null}"
+    printf "OC_NATIVE_SESSION_EXPORTED=true\n" >> "${GITHUB_ENV:-/dev/null}"
+    echo "[OC][attempt=$attempt] native session exported: $native_session_id"
+  else
+    echo "::warning title=Native OpenCode session export failed::Durable logical state remains available."
+    printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
+    printf "native_session_export_file=\n" >> "$output_file"
+    printf "native_session_artifact=\n" >> "$output_file"
+  fi
+else
+  printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
+  printf "native_session_export_file=\n" >> "$output_file"
+  printf "native_session_artifact=\n" >> "$output_file"
+fi
+
 {
   printf "exit_code=%s\n" "$exit_code"
   printf "termination_reason=%s\n" "$termination_reason"
