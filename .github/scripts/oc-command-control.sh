@@ -7,7 +7,6 @@ set -euo pipefail
 # capabilities, write permissions, or credentials, and never decides which
 # tools the agent may use (.opencode/instructions.md owns that contract).
 bash .github/scripts/select-oc-task-mode.sh
-bash .github/scripts/oc-session-state.sh load
 
 # Every /oc request gets an initial compact checkpoint in the issue/PR body.
 OC_SESSION_PHASE=received OC_SESSION_STATUS=active OC_SESSION_MILESTONE="request_received" OC_SESSION_NEXT_ACTION="inspect current issue context and Git state" OC_DURABLE_WORK=false bash .github/scripts/record-oc-session-progress.sh || true
@@ -28,6 +27,13 @@ read_back_output() {
   fi
   printf '%s' "$val"
 }
+
+new_session_requested="$(read_back_output OC_NEW_SESSION_REQUEST)"
+if [[ "${new_session_requested:-false}" == "true" ]]; then
+  OC_NEW_SESSION_REQUEST=true bash .github/scripts/oc-session-state.sh load
+else
+  bash .github/scripts/oc-session-state.sh load
+fi
 
 session_required="$(read_back_output OC_SESSION_REQUIRED)"
 task_mode="$(read_back_output OC_TASK_MODE)"
