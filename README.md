@@ -20,11 +20,13 @@ straight from GitHub Actions, with durable sessions and automatic recovery. 🚀
 ![speed](https://img.shields.io/badge/speed-cached%20%26%20verified%20⚡-d97706?style=flat-square)
 ![tests](https://img.shields.io/badge/tests-batteries%20included%20🧪-2ea44f?style=flat-square)
 ![party](https://img.shields.io/badge/party-mode-ON%20🎉-8A2BE2?style=flat-square)
+![edition](https://img.shields.io/badge/edition-ULTIMATE%20🐉-e11d48?style=flat-square)
 
 🟥 🟧 🟨 🟩 🟦 🟪 🌈 🎆 🌈 🟪 🟦 🟩 🟨 🟧 🟥
 
 **[Quick start](#-quick-start-5-steps)** •
 **[How it flows](#-how-a-run-flows)** •
+**[Cheat-sheet](#-ultimate-cheat-sheet)** •
 **[Commands](#-commands)** •
 **[Config](#%EF%B8%8F-configuration)** •
 **[Verify](#-verify-a-checkout)**
@@ -35,6 +37,8 @@ straight from GitHub Actions, with durable sessions and automatic recovery. 🚀
 
 > ### 🎤 “Talk to your CI like you'd text a friend.”
 > One comment in, one full report out — plans, edits, tests, evidence. 🐉💬
+
+> ⚡ **60-second TL;DR** — copy the wiring → add `OPENCODE_API_KEY` → drop `/oc hello` on an issue → read the report. 🎉
 
 ---
 
@@ -140,6 +144,19 @@ Runs queue per issue/PR (no parallel stomping), allow up to ~5.5 h of agent time
 and post their result back to the same thread.
 
 > 💡 **Tip:** short and specific beats long and vague — `/oc fix test-foo flake` flies.
+
+---
+
+## 🏆 Ultimate cheat-sheet
+
+| 🎨 | 🛠️ | What you get | 🌟 |
+| --- | --- | --- | --- |
+| 💬 **Talk** | `/oc <anything>` on an issue or PR | a full report in the same thread | 🌟🌟🌟 |
+| 🔁 **Resume** | `/oc continue` | timed-out runs pick up where they stopped | 🌟🌟🌟 |
+| 👀 **Watch** | Actions tab | live `tool ->` log stream, secrets redacted | 🌟🌟 |
+| 🔍 **Audit** | run-record artifact + `oc/session-*` | every run leaves a paper trail | 🌟🌟 |
+| 📄 **Export** | `pandoc-pdf.yml` | Markdown → PDF with one push | 🌟 |
+| 🧊 **Speed** | `opencode-cache.yml` | digest-verified binary, warmed daily | 🌟 |
 
 ---
 
