@@ -34,6 +34,12 @@ outputs:
     value: ${{ steps.run.outputs.durable_work }}
   clarification_required:
     value: ${{ steps.run.outputs.clarification_required }}
+  native_session_id:
+    value: ${{ steps.run.outputs.native_session_id }}
+  native_session_export_file:
+    value: ${{ steps.run.outputs.native_session_export_file }}
+  native_session_artifact:
+    value: ${{ steps.run.outputs.native_session_artifact }}
 runs:
   using: composite
   steps:

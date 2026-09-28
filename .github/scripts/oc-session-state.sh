@@ -82,6 +82,10 @@ export_state(){
   emit_env OC_SESSION_PR_URL "$(jq -r '.active_pr_url // ""' "$state_file")"
   emit_env OC_SESSION_PHASE "$(jq -r '.phase // "unknown"' "$state_file")"
   emit_env OC_SESSION_STATUS "$(jq -r '.status // "new"' "$state_file")"
+  emit_env OC_NATIVE_SESSION_ID "$(jq -r '.native_session_id // ""' "$state_file")"
+  emit_env OC_NATIVE_SESSION_RUN_ID "$(jq -r '.native_session_run_id // ""' "$state_file")"
+  emit_env OC_NATIVE_SESSION_ARTIFACT "$(jq -r '.native_session_artifact // ""' "$state_file")"
+  emit_env OC_NATIVE_SESSION_EXPORTED "$(jq -r '.native_session_exported // false' "$state_file")"
   emit_env OC_SESSION_EXISTS true
   emit_out state_file "$state_file"
   emit_out session_id "$(jq -r '.session_id // ""' "$state_file")"
@@ -143,6 +147,10 @@ case "$cmd" in
   "last_run_id":null,
   "agent_attempt":null,
   "termination_reason":null,
+  "native_session_id":"",
+  "native_session_run_id":null,
+  "native_session_artifact":"",
+  "native_session_exported":false,
   "last_checkpoint_at":"$now"
 }
 EOF
@@ -202,7 +210,9 @@ EOF
       completed_steps:[],remaining_steps:[],tests_run:[],ci_runs:[],research_sources:[],
       warnings:[],artifacts:[],next_action:"classify request",
       durable_work:false,target_repository:"",target_base:$base,target_branch:"",
-      last_run_id:null,agent_attempt:null,termination_reason:null,last_checkpoint_at:$now
+      last_run_id:null,agent_attempt:null,termination_reason:null,
+      native_session_id:"",native_session_run_id:null,native_session_artifact:"",native_session_exported:false,
+      last_checkpoint_at:$now
     }')"
     export_state "$json"
     emit_env OC_SESSION_MEMORY_PERSISTED false

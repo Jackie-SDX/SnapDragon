@@ -49,18 +49,18 @@ elif [[ "$lower" =~ ^continue([[:space:]]|$) ]] &&
   intent=continue
   request="$(printf '%s' "$request" | sed -E 's#^continue[[:space:]]*##')"
   printf '%s\n' "$request" > "$request_file"
-elif [[ "$session_exists" == "true" ]]; then
-  resume_requested=true
-  session_required=true
-  branch_required=true
-  mode=code
-  intent=code
 elif [[ "$lower" =~ ^merge([[:space:]]|$) ]]; then
   merge_requested=true
   session_required=true
   branch_required=true
   mode=merge
   intent=merge
+elif [[ "$session_exists" == "true" ]]; then
+  resume_requested=true
+  session_required=true
+  branch_required=true
+  mode=code
+  intent=code
 else
   positive_request="$(printf '%s' "$lower" | sed -E -e '/^[[:space:]]*(do not|dont|don'\''t|without)\b/d' -e 's/\b(do not|dont|don'\''t|without)\b.*$//g')"
 

@@ -64,6 +64,11 @@ agent_worktree=""
 agent_cwd=""
 session_branch="${OC_SESSION_BRANCH:-}"
 session_state_file="${OC_SESSION_STATE_FILE:-}"
+native_session_id="${OC_NATIVE_SESSION_ID:-}"
+native_restore_file="${OC_NATIVE_SESSION_EXPORT_FILE:-}"
+native_session_artifact=""
+native_session_export_file=""
+native_session_restored=false
 : > "$safe_log"
 : > "$progress_log"
 
@@ -121,7 +126,11 @@ if [[ "${OC_TARGET_MODE:-local}" == "remote" ]]; then
   [[ -n "$task_prompt" ]] || task_prompt="Inspect the target repository workspace and implement the requested change. Work inside this repository only; use its own project instructions. You may commit, push, create/update PRs, inspect CI, repair failures, and merge when the user explicitly requests that lifecycle step. Never force-push, rewrite protected history, bypass branch protection, expose credentials, or make unrelated changes."
   model_name="${MODEL:-opencode/mimo-v2.6-flash-free}"
   task_prompt="$task_prompt"$'\n\n'"$activity_guidance"
-  agent_cmd=(opencode run --thinking --format json --dir "$ws" --model "$model_name")
+  if [[ "$native_session_restored" == "true" ]]; then
+    agent_cmd=(opencode run --session "$native_session_id" --thinking --format json --dir "$ws" --model "$model_name")
+  else
+    agent_cmd=(opencode run --thinking --format json --dir "$ws" --model "$model_name")
+  fi
   [[ -n "${VARIANT:-}" ]] && agent_cmd+=(--variant "$VARIANT")
   agent_cmd+=(--agent build --title "oc remote ${OC_TARGET_REPO:-target}")
 else
@@ -156,11 +165,31 @@ else
     task_prompt="Execute the user's latest request directly. Start from the request itself. Do not assume repository inspection, issue-history retrieval, durable-memory loading, or CI inspection is necessary. Decide whether additional context is actually needed for this request; retrieve it only when it materially helps answer or execute the request."
   fi
   task_prompt="$task_prompt"$'\n\n'"$activity_guidance"
-  agent_cmd=(opencode run --thinking --format json --dir "$agent_cwd" --model "$model_name")
+  if [[ "$native_session_restored" == "true" ]]; then
+    agent_cmd=(opencode run --session "$native_session_id" --thinking --format json --dir "$agent_cwd" --model "$model_name")
+  else
+    agent_cmd=(opencode run --thinking --format json --dir "$agent_cwd" --model "$model_name")
+  fi
   [[ -n "${VARIANT:-}" ]] && agent_cmd+=(--variant "$VARIANT")
   agent_cmd+=(--agent build --title "oc local ${TARGET_NUMBER:-issue}")
 fi
-  sanitize_line() {
+  restore_native_session() {
+  [[ -n "$native_session_id" && -s "$native_restore_file" && -n "$agent_cwd" ]] || return 0
+  if [[ ! "$native_session_id" =~ ^ses_[A-Za-z0-9_-]+$ ]]; then
+    echo "::warning title=Invalid native OpenCode session ID::Ignoring persisted session ID '$native_session_id'."
+    native_session_id=""
+    return 0
+  fi
+  echo "[OC][attempt=$attempt] importing native OpenCode session $native_session_id"
+  if (cd "$agent_cwd" && opencode import "$native_restore_file" >/dev/null 2>&1); then
+    native_session_restored=true
+    echo "[OC][attempt=$attempt] native OpenCode session restored"
+  else
+    echo "::warning title=Native OpenCode session restore failed::Falling back to durable logical session state."
+  fi
+}
+
+sanitize_line() {
   local line="$1" secret
   for secret in \
     "${COMPOSIO_API_KEY:-}" \
@@ -182,6 +211,10 @@ fi
       -e "s/(sk-or-v1-[[:alnum:]_-]{20,})/[REDACTED_EXTERNAL_API_KEY]/g" \
       -e "s/(Bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/g"
 }
+
+if [[ -n "$native_session_id" ]]; then
+  restore_native_session
+fi
 
 configured_timeout_seconds=$((agent_timeout_minutes * 60))
 effective_timeout_seconds="$configured_timeout_seconds"
@@ -301,6 +334,10 @@ heartbeat_pid=$!
 
 while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
   if jq -e . >/dev/null 2>&1 <<<"$raw_line"; then
+    event_session_id="$(jq -r '.sessionID // empty' <<<"$raw_line")"
+    if [[ "$event_session_id" =~ ^ses_[A-Za-z0-9_-]+$ ]]; then
+      native_session_id="$event_session_id"
+    fi
     event_type="$(jq -r '.type // empty' <<<"$raw_line")"
     case "$event_type" in
       text)
