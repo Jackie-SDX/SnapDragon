@@ -7,50 +7,13 @@ on:
     types: [created]
 
 jobs:
-  oc_claim:
-    concurrency:
-      group: oc-claim-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
-      cancel-in-progress: false
-      queue: max
-    if: |
-      github.event.comment.user.type == 'User' &&
-      github.event.comment.user.login == github.repository_owner &&
-      (
-        startsWith(github.event.comment.body, '/oc ') ||
-        github.event.comment.body == '/oc' ||
-        startsWith(github.event.comment.body, '/opencode ') ||
-        github.event.comment.body == '/opencode'
-      ) &&
-      !startsWith(github.event.comment.body, '/oc retry failed jobs') &&
-      !startsWith(github.event.comment.body, '/opencode retry failed jobs')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-    outputs:
-      accepted: ${{ steps.claim.outputs.accepted }}
-    steps:
-      - name: Checkout repository for claim script
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-      - name: Claim unique /oc comment delivery
-        id: claim
-        shell: bash
-        run: bash .github/scripts/claim-oc-command.sh
-
   opencode:
-    needs: oc_claim
+
     concurrency:
       group: oc-agent-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
       queue: max
     if: |
-      needs.oc_claim.outputs.accepted == 'true' &&
       github.event.comment.user.type == 'User' &&
       github.event.comment.user.login == github.repository_owner &&
       (
@@ -58,9 +21,7 @@ jobs:
         github.event.comment.body == '/oc' ||
         startsWith(github.event.comment.body, '/opencode ') ||
         github.event.comment.body == '/opencode'
-      ) &&
-      !startsWith(github.event.comment.body, '/oc retry failed jobs') &&
-      !startsWith(github.event.comment.body, '/opencode retry failed jobs')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
@@ -78,16 +39,10 @@ jobs:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
       COMPOSIO_USER_ID: ${{ vars.COMPOSIO_USER_ID || github.repository_owner }}
-      OC_CI_VERIFY_SETTLE_SECONDS: "30"
       OC_JOB_BUDGET_SECONDS: "21600"
       OC_JOB_SAFETY_MARGIN_SECONDS: "1800"
       OC_CONTEXT_SEED_BYTES: "60000"
-      OC_SESSION_CHECKPOINT_INTERVAL_SECONDS: "300"
-      OC_CI_WATCH_MINUTES: "45"
-      OC_CI_WATCH_POLL_SECONDS: "20"
-      OC_CAPABILITY_AUTO_INSTALL: "false"
-      OC_CONTEXT_MODE: "on-demand"
-      OC_CONTEXT_COLLECTOR: ".github/scripts/collect-oc-context.sh"
+
 
     steps:
       - name: Checkout repository
@@ -95,6 +50,7 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+
 
       - name: Capture initial state
         id: initial_state
@@ -107,23 +63,25 @@ jobs:
           echo "OC_RUN_START_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
           echo "OC_JOB_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
 
-      - name: Resolve /oc target
+
+      - name: Load durable /oc session state
         id: target
         shell: bash
         env:
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
-        run: bash .github/scripts/resolve-oc-target.sh
+        run: bash .github/scripts/oc-session-state.sh load
 
-      - name: Classify command and prepare durable session
+
+      - name: Prepare durable /oc session
         id: task_mode
         shell: bash
         env:
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
           BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
-        run: bash .github/scripts/oc-command-control.sh
+        run: bash .github/scripts/prepare-oc-session.sh
+
 
       - name: Resolve and verify OpenCode release
-        if: env.OC_TASK_MODE != 'merge'
         id: opencode_release
         shell: bash
         env:
@@ -149,8 +107,8 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
+
       - name: Restore verified OpenCode cache
-        if: env.OC_TASK_MODE != 'merge'
         id: cache_restore
         continue-on-error: true
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -158,8 +116,8 @@ jobs:
           path: ~/.opencode/bin
           key: opencode-${{ runner.os }}-${{ runner.arch }}-${{ steps.opencode_release.outputs.version }}
 
+
       - name: Install OpenCode on cache miss
-        if: env.OC_TASK_MODE != 'merge' && steps.cache_restore.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -176,9 +134,11 @@ jobs:
           install -Dm755 "$binary" "$HOME/.opencode/bin/opencode"
           "$HOME/.opencode/bin/opencode" --version
 
+
       - name: Add OpenCode to PATH
         shell: bash
         run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
 
       - name: Restore native OpenCode session
         if: env.OC_NATIVE_SESSION_ID != '' && env.OC_NATIVE_SESSION_RUN_ID != '' && env.OC_NATIVE_SESSION_ARTIFACT != ''
@@ -203,35 +163,18 @@ jobs:
           echo "OC_NATIVE_SESSION_EXPORT_FILE=$export_file" >> "$GITHUB_ENV"
           echo "Recovered native OpenCode session artifact for $OC_NATIVE_SESSION_ID"
 
-      - name: Restore durable native OpenCode session snapshot
-        if: env.OC_NATIVE_SESSION_ID != '' && env.OC_NATIVE_SESSION_ARCHIVE_BRANCH != ''
-        continue-on-error: true
-        shell: bash
-        run: bash .github/scripts/restore-oc-native-session.sh
 
-      - name: Prepare remote target workspace
-        if: env.OC_TASK_MODE != 'merge' && steps.target.outputs.mode == 'remote'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
-          TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
-          OC_CONTROLLER_ROOT: ${{ github.workspace }}
-        run: bash .github/scripts/prepare-oc-target.sh
-
-      - name: Bootstrap Composio session MCP (all non-merge tasks)
-        if: env.OC_TASK_MODE != 'merge'
+      - name: Bootstrap Composio MCP bridge
         continue-on-error: true
         id: composio_session
         shell: bash
         run: bash .github/scripts/prepare-composio-mcp.sh
 
-      - name: Run primary OpenCode attempt
+
+      - name: Run OpenCode attempt
         id: attempt_1
-        if: env.OC_TASK_MODE != 'merge'
         continue-on-error: true
         env:
-          OC_CONTROLLER_UNIVERSAL_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
-          OC_CONTROLLER_GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
           COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
         uses: ./.github/actions/oc-attempt
         with:
@@ -240,10 +183,9 @@ jobs:
           target_number: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
           base_ref: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
           initial_sha: ${{ steps.initial_state.outputs.sha }}
-          mode: ${{ steps.target.outputs.mode }}
-          task_mode: ${{ env.OC_TASK_MODE }}
 
-      - name: Persist native OpenCode session archive
+
+      - name: Persist native OpenCode session artifact
         if: always() && steps.attempt_1.outputs.native_session_export_file != '' && steps.attempt_1.outputs.native_session_artifact != ''
         continue-on-error: true
         uses: actions/upload-artifact@v7.0.1
@@ -253,58 +195,30 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+
       - name: Post controlled timeout continuation
         if: always() && (steps.attempt_1.outputs.termination_reason == 'timeout' || steps.attempt_1.outputs.timed_out == 'true')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
           TARGET_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || 0 }}
-          OC_TARGET_MODE: ${{ steps.target.outputs.mode }}
-          OC_TARGET_REPO: ${{ steps.target.outputs.target_repo }}
-          OC_TARGET_BASE: ${{ steps.target.outputs.target_base }}
-          OC_TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
-          OC_TARGET_WORKSPACE: ${{ env.OC_TARGET_WORKSPACE }}
           BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
           OPENCODE_AGENT_TIMEOUT_MINUTES: "330"
         shell: bash
         run: bash .github/scripts/post-oc-continuation.sh
 
-      - name: Post concise /oc result
+
+      - name: Post final /oc result
         if: always()
         continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
-          TASK_MODE: ${{ env.OC_TASK_MODE }}
-          OC_TARGET_MODE: ${{ steps.target.outputs.mode }}
-          OC_TARGET_REPO: ${{ steps.target.outputs.target_repo }}
-          OC_TARGET_BRANCH: ${{ steps.target.outputs.target_branch }}
           A1: ${{ steps.attempt_1.outputs.agent_outcome }}
           CL1: ${{ steps.attempt_1.outputs.clarification_required }}
-          MERGE_REQUESTED: ${{ env.OC_MERGE_REQUESTED }}
-          MERGE_EXIT: ${{ env.OC_MERGE_EXIT }}
         run: bash .github/scripts/post-oc-result.sh
 
-      - name: Persist session milestone
-        if: always() && env.OC_SESSION_REQUIRED == 'true' && env.OC_TASK_MODE == 'code'
-        continue-on-error: true
-        shell: bash
-        env:
-          DW1: ${{ steps.attempt_1.outputs.durable_work }}
-          CL1: ${{ steps.attempt_1.outputs.clarification_required }}
-          A1: ${{ steps.attempt_1.outputs.agent_outcome }}
-          RESULT_PUBLISHED: ${{ env.OC_RESULT_PUBLISHED || 'false' }}
-          FINAL_RESPONSE_CAPTURED: ${{ env.OC_FINAL_RESPONSE_CAPTURED || 'false' }}
-        run: |
-          durable=false
-          [[ "$DW1" == "true" ]] && durable=true
-          phase=blocked; status=active; next="inspect the durable branch and continue"
-          [[ "$CL1" == "true" ]] && phase=waiting_for_clarification && status=waiting && next="answer the clarification request, then resume with /oc continue"
-          [[ "$CL1" != "true" ]] && [[ "$A1" == "success" && "$RESULT_PUBLISHED" == "true" && "$FINAL_RESPONSE_CAPTURED" == "true" ]] && phase=completed && status=complete && next="await user direction"
-          [[ "$CL1" != "true" ]] && [[ "$A1" == "success" && ( "$RESULT_PUBLISHED" != "true" || "$FINAL_RESPONSE_CAPTURED" != "true" ) ]] && phase=blocked && status=active && next="repair the final response handoff, then resume with /oc continue"
-          [[ "$CL1" != "true" ]] && [[ "$A1" != "success" && "$durable" == "true" ]] && phase=checkpointed && next="resume with /oc continue"
-          OC_DURABLE_WORK="$durable" OC_SESSION_PHASE="$phase" OC_SESSION_STATUS="$status" OC_SESSION_NEXT_ACTION="$next" bash .github/scripts/record-oc-session-progress.sh || true
 
       - name: Final status
         if: always()
@@ -312,57 +226,22 @@ jobs:
           A1: ${{ steps.attempt_1.outputs.agent_outcome }}
           DW1: ${{ steps.attempt_1.outputs.durable_work }}
           CL1: ${{ steps.attempt_1.outputs.clarification_required }}
-          TASK_MODE: ${{ env.OC_TASK_MODE }}
-          MERGE_REQUESTED: ${{ env.OC_MERGE_REQUESTED }}
-          MERGE_EXIT: ${{ env.OC_MERGE_EXIT }}
           RESULT_PUBLISHED: ${{ env.OC_RESULT_PUBLISHED || 'false' }}
           MEMORY_PERSISTED: ${{ env.OC_SESSION_MEMORY_PERSISTED || 'false' }}
           FINAL_RESPONSE_CAPTURED: ${{ env.OC_FINAL_RESPONSE_CAPTURED || 'false' }}
         run: |
           set -euo pipefail
           success=false
-          if [[ "$MERGE_REQUESTED" == "true" ]]; then
-            [[ "$MERGE_EXIT" == "0" ]] && success=true
-          elif [[ "$CL1" == "true" ]]; then
+          if [[ "$CL1" == "true" ]]; then
             [[ "$RESULT_PUBLISHED" == "true" && "$MEMORY_PERSISTED" == "true" ]] && success=true
           elif [[ "$A1" == "success" ]]; then
             [[ "$RESULT_PUBLISHED" == "true" && "$MEMORY_PERSISTED" == "true" && "$FINAL_RESPONSE_CAPTURED" == "true" ]] && success=true
           elif [[ "$DW1" == "true" ]]; then
             success=true
           fi
-          if [[ "$success" == "true" ]]; then
-            if [[ "$CL1" == "true" ]]; then
-              echo "Clarification requested; session is waiting for user input. Resume with /oc continue."
-            elif [[ "$A1" == "success" ]]; then
-              echo "OpenCode completed and its final response plus durable session memory were verified."
-            else
-              echo "Durable progress checkpointed; resume with /oc continue."
-            fi
-            exit 0
-          fi
-          if [[ "$A1" == "success" && "$FINAL_RESPONSE_CAPTURED" != "true" ]]; then
-            echo "::error title=Final response capture not verified::OpenCode succeeded, but its final response was not captured as a non-empty answer."
-          elif [[ "$A1" == "success" && "$RESULT_PUBLISHED" != "true" ]]; then
-            echo "::error title=Final response not verified::OpenCode succeeded, but the final issue response was not verified as published."
-          elif [[ "$A1" == "success" && "$MEMORY_PERSISTED" != "true" ]]; then
-            echo "::error title=Session memory not verified::OpenCode succeeded, but durable session memory was not verified after the response."
-          else
-            echo "::error title=Agent operation not completed::No successful completion or durable checkpoint was produced."
-          fi
+          if [[ "$success" == "true" ]]; then exit 0; fi
+          echo "::error title=OpenCode operation not verified::No successful completion or durable checkpoint was produced."
           exit 1
-
-      - name: Clean up remote target workspace
-        if: always()
-        continue-on-error: true
-        shell: bash
-        env:
-          OC_TARGET_WORKSPACE: ${{ env.OC_TARGET_WORKSPACE }}
-        run: |
-          set -euo pipefail
-          ws="${OC_TARGET_WORKSPACE:-}"
-          [[ -z "$ws" ]] && exit 0
-          case "$ws" in /home/runner/work/_temp/*|/tmp/*) rm -rf "$(dirname "$ws")" ;; *) echo "::error title=Remote cleanup blocked::Unexpected workspace path."; exit 1 ;; esac
-
       - name: Clean up Composio session MCP
         if: always()
         continue-on-error: true
@@ -370,43 +249,3 @@ jobs:
           SESSION_ID: ${{ steps.composio_session.outputs.session_id }}
           HEADERS_FILE: ${{ steps.composio_session.outputs.headers_file }}
         run: bash .github/scripts/cleanup-composio-mcp.sh
-
-      - name: Clear /oc running reaction
-        if: always()
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: bash .github/scripts/oc-running-reaction.sh remove
-
-  retry-failed-jobs:
-    concurrency:
-      group: oc-retry-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
-      cancel-in-progress: false
-    if: |
-      github.event.comment.user.login == github.repository_owner &&
-      (
-        startsWith(github.event.comment.body, '/oc retry failed jobs') ||
-        startsWith(github.event.comment.body, '/opencode retry failed jobs')
-      )
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: write
-      contents: read
-      issues: write
-      pull-requests: read
-      checks: read
-      statuses: read
-    env:
-      GH_TOKEN: ${{ secrets.UNIVERSAL_TOKEN || github.token }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-      - name: Execute selective failed-job retry
-        shell: bash
-        run: bash .github/scripts/retry-oc-failed-jobs.sh

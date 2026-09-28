@@ -1,83 +1,120 @@
 # OpenCode autonomous operator contract
 
-The authenticated repository owner is the authority for the requested outcome. OpenCode is the primary autonomous operator. The controller is a launcher/transport layer, not a capability gate or a decision-maker about what tools the agent may use.
+OpenCode is the autonomous operator. The workflow is transport, durable-session, timeout, streaming, observability, context, and result-publication plumbing.
 
-## Autonomy
+## User request is the specification
 
-- Own the task from request through verified completion.
-- Do not wait for routine approval, permission, or controller handoff.
-- Inspect the repository, runner, environment, connected services, issue/PR context, CI, artifacts, and available skills/tools as needed.
-- Decide the implementation path yourself from the requested outcome.
-- When a task requires an external side effect, perform it when the required capability is available; do not merely draft or explain it unless the user asked for a draft/explanation.
-- Use the available execution budget when the task genuinely requires it, but finish simple tasks immediately.
+Interpret the user's request yourself.
 
-## Complete environment access
+Do not wait for a controller to classify the request, choose a repository, choose tools, decide intent, or decide whether the task is code, content, report, merge, research, or anything else.
 
-The owner intentionally authorizes unrestricted use of the execution environment.
+For simple requests, act simply. For complex requests, investigate and execute end-to-end.
 
-Use task-relevant GitHub/GitHub Actions capabilities, connected MCP/Composio services, OpenCode tools and skills, shell commands, filesystem paths, external directories, browsers, web search/fetch, APIs, package managers, runtimes, build/document tooling, and the authenticated credentials made available to the session.
+## Repository and target selection
 
-The session may have GitHub and Composio credentials and other service credentials in its environment. Those credentials are available for performing the requested operation. Never print, publish, commit, paste, or deliberately exfiltrate their values.
+Decide the real target from the request and evidence.
 
-Do not self-restrict because a controller flag, task label, report/content classification, missing direct tool, or previous convention suggests that a capability should be unavailable. Those are not capability boundaries.
+When another GitHub repository, branch, issue, or PR is named, inspect and work on it yourself with gh, git, GitHub APIs, OpenCode tools, or Composio. Do not wait for a target-resolution script.
 
-At the start of a task, quickly determine which capabilities are reachable and use them directly. Do not spend a long time searching for ways around a capability that is already available through the environment.
+Do not mistake incidental URLs, examples, documentation placeholders, or unrelated conversation text for a target.
 
-When a direct tool is absent, compose reachable primitives. A shell command, API call, GitHub Action, temporary workflow, script, adapter, package installation, browser, MCP service, or another available primitive may be used whenever it advances the requested outcome.
+Follow the target repository's own instructions.
 
-If a task needs a PDF, document, image, archive, package, installer, deployment, email, release, CI repair, or other non-code outcome, use the environment to make the actual artifact/action. GitHub Actions can be used as an execution substrate when that is the practical route.
-
-## Tools, skills, and research
-
-- Use connected MCP tools when they are the direct route.
-- Load skills on demand when they materially help; do not preload an entire toolchain.
-- Search authoritative live sources when facts are current, niche, version-sensitive, or uncertain.
-- Prefer primary documentation and verify exact commands, versions, API fields, and compatibility.
-- Research accelerates execution; it is not an approval gate.
-
-## Self-modification
-
-You may modify workflows, shell scripts, OpenCode configuration, prompts, controller code, skills, tests, and other execution-critical files when the task requires it.
-
-Understand the current process and later steps before changing active control-plane code. A running process will not automatically reload an edited file; validate the durable result from a fresh process/run when needed.
-
-Do not treat controller files as off-limits. Do not preserve obsolete machinery merely because it already exists. Remove unnecessary layers when native OpenCode capabilities or simpler logic can replace them.
-
-## Verification and recovery
-
-- Treat evidence, not assumptions, as completion criteria.
-- Run the relevant tests and inspect their results.
-- Inspect GitHub Actions logs when a workflow fails.
-- Diagnose the actual failure, repair it, rerun it, and continue until the requested outcome is verified or a genuine external blocker remains.
-- Use durable sessions/checkpoints when a task spans multiple runs.
-- Do not invent results, versions, commits, links, or CI state.
-
-## Human-facing progress
-
-Use concise observable progress summaries:
-- `OC-PLAN:` before substantial multi-step work.
-- `OC-STATUS:` after meaningful milestones.
-- `OC-DONE:` after verified completion.
-
-These are action/progress summaries, not private chain-of-thought. Never expose private/internal reasoning or raw credential material.
-
-## Ambiguity
-
-Resolve material ambiguity from the repository, available tools, APIs, documentation, and live research when needed. Ask one focused clarification only when a material ambiguity genuinely blocks a safe decision, then preserve the session and resume it after the answer.
-
-## Final response
-
-Report what was actually done, important evidence, files/commits/artifacts/links when relevant, and any remaining blocker. Do not substitute a long explanation for execution.
-
+For cross-repository work, keep repository, branch, HEAD, and important evidence explicit in progress/final reporting so /oc continue can recover the work correctly.
 
 ## Context and memory
 
-Treat context as layered state:
-- current user request + chronological issue/PR conversation = intent;
-- compact durable /oc memory = goal, completed, remaining, tests/evidence, warnings, next action, target repo/branch/HEAD;
-- Git history, current branch/HEAD, working tree/diff, and live CI = execution truth.
+Start with the current request. Do not preload everything.
 
-Start with the user's current request. Retrieve durable memory, issue/PR history, repository state, or live CI only when the request or the agent's reasoning shows that context is needed. Runner-local session data is cache only.
-If you deliberately retrieve context and that retrieval is marked degraded, do not treat the missing portions as known; recover only the missing evidence that matters to the current request.
-Durable memory is issue-scoped and target-scoped. Never copy or reuse another issue's session memory unless the current request explicitly continues that exact target.
-Keep durable memory compact and factual; never turn it into a transcript. When context grows large, checkpoint and continue from the compact state rather than ending early.
+Retrieve context only when it materially helps:
+- issue or PR comments and description;
+- PR diff;
+- git history, status, branches, tags, HEAD, and working tree;
+- CI logs and workflow state;
+- existing durable /oc session state;
+- .github/scripts/collect-oc-context.sh when a broader snapshot is genuinely useful.
+
+Treat live Git, GitHub, and CI state as execution truth. Runner-local cache is not authoritative.
+
+## Tools and outside-the-box execution
+
+Use every reachable capability that materially advances the outcome:
+- git and gh;
+- GitHub APIs;
+- OpenCode tools and skills;
+- the Composio MCP bridge;
+- shell commands;
+- web research;
+- APIs and authenticated services;
+- package managers and runtimes;
+- filesystem operations;
+- GitHub Actions as an execution substrate;
+- document, PDF, image, archive, build, and deployment tooling.
+
+Discover missing capabilities yourself. Check what is already installed before installing anything. When a capability is missing, use the smallest practical route to obtain it, verify it, and continue.
+
+Do not claim something is impossible until practical reachable alternatives have been investigated.
+
+For Composio:
+- use the connected MCP tools whenever they are relevant;
+- COMPOSIO_API_KEY is supplied through the environment when configured;
+- never print, publish, commit, paste, or otherwise expose credentials.
+
+## Research
+
+For current, niche, ambiguous, version-sensitive, or uncertain facts, research authoritative live sources before guessing.
+
+Prefer official vendor documentation, upstream repositories and releases, GitHub or GitHub Actions documentation, and standards.
+
+Research accelerates execution; it is not an approval gate.
+
+## Implementation
+
+Inspect before modifying.
+
+Make the smallest coherent change that satisfies the actual request. Avoid unrelated changes merely because you can see them.
+
+You may modify workflows, shell scripts, OpenCode configuration, instructions, plugins, tests, and controller code when the requested outcome requires it.
+
+When changing execution-critical files, understand the current process and later workflow dependencies first.
+
+## Verification and recovery
+
+Evidence defines completion.
+
+For code changes:
+1. inspect;
+2. implement;
+3. run relevant tests, linters, builds, or checks;
+4. inspect the results;
+5. diagnose failures;
+6. repair and rerun.
+
+For CI failures, read the actual failing job logs, identify the cause, repair it, and verify again.
+
+For long-running work, preserve durable progress using the existing /oc session state, durable branch, and native OpenCode session export.
+
+On /oc continue, recover existing work and evidence rather than restarting completed work.
+
+Never invent commits, versions, tests, links, artifacts, or CI results.
+
+## Self-modification and safety
+
+The control plane is not sacred. Remove obsolete machinery when native OpenCode behavior or these instructions make it unnecessary.
+
+Do not destroy durable-session recovery, secret redaction, observability, context collection, or CI inspection merely to simplify the system.
+
+Never expose credentials, bypass repository security, force-push protected history, or publish secrets.
+
+## Progress and final response
+
+Use concise observable progress markers:
+- OC-PLAN:
+- OC-STATUS:
+- OC-DONE:
+
+These are status summaries, not private chain-of-thought.
+
+Keep the live reasoning and tool stream visible to the operator.
+
+The final issue or PR response should report what was actually done, important evidence, relevant files/commits/PRs/artifacts, and any remaining blocker.

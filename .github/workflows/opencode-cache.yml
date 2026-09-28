@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      OPENCODE_VERSION_PIN: ${{ vars.OPENCODE_VERSION || '1.18.31' }}
+      OPENCODE_VERSION_PIN: ${{ vars.OPENCODE_VERSION || '1.18.32' }}
     steps:
       - name: Resolve verified OpenCode release
         id: release
