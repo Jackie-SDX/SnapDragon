@@ -215,6 +215,17 @@ sanitize_line() {
 if [[ -n "$native_session_id" ]]; then
   restore_native_session
 fi
+if [[ "$native_session_restored" == "true" ]]; then
+  if [[ "${OC_TARGET_MODE:-local}" == "remote" ]]; then
+    agent_cmd=(opencode run --session "$native_session_id" --thinking --format json --dir "$agent_cwd" --model "${MODEL:-opencode/mimo-v2.6-flash-free}")
+    [[ -n "${VARIANT:-}" ]] && agent_cmd+=(--variant "$VARIANT")
+    agent_cmd+=(--agent build --title "oc remote ${OC_TARGET_REPO:-target}")
+  else
+    agent_cmd=(opencode run --session "$native_session_id" --thinking --format json --dir "$agent_cwd" --model "${MODEL:-opencode/mimo-v2.6-flash-free}")
+    [[ -n "${VARIANT:-}" ]] && agent_cmd+=(--variant "$VARIANT")
+    agent_cmd+=(--agent build --title "oc local ${TARGET_NUMBER:-issue}")
+  fi
+fi
 
 configured_timeout_seconds=$((agent_timeout_minutes * 60))
 effective_timeout_seconds="$configured_timeout_seconds"
