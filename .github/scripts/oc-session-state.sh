@@ -21,7 +21,7 @@ emit_env(){ printf '%s=%s
 emit_out(){ printf '%s=%s
 ' "$1" "$2" >> "$out_file"; }
 
-issue_body(){ gh api "/repos/$repo/issues/$target" --jq '.body // ""' 2>/dev/null; }
+issue_body(){ gh issue view "$target" --repo "$repo" --json body --jq .body 2>/dev/null || gh api "/repos/$repo/issues/$target" --jq .body 2>/dev/null; }
 
 extract_block(){
   local body="$1" begin="$2" end="$3"
@@ -96,6 +96,63 @@ valid_json() { [[ -n "$(printf "%s" "$1" | tr -d "[:space:]")" ]] && jq -e 'type
 
 case "$cmd" in
   load)
+    if [[ "${OC_NEW_SESSION_REQUEST:-false}" == "true" ]]; then
+      now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      base="$(printenv BASE_REF || printf main)"
+      target_repo="${OC_TARGET_REPO:-}"
+      target_base="${OC_TARGET_BASE:-$base}"
+      target_branch="${OC_TARGET_BRANCH:-}"
+      fresh_suffix="$(date -u +%Y%m%d%H%M%S)-${GITHUB_RUN_ID:-0}-${GITHUB_RUN_ATTEMPT:-1}"
+      fresh_session_id="oc-$target-new-$fresh_suffix"
+      fresh_branch="oc/session-$target-new-$fresh_suffix"
+      json="$(cat <<EOF
+{
+  "schema_version":2,
+  "session_id":"$fresh_session_id",
+  "repository":"$repo",
+  "issue":$target,
+  "base_ref":"$base",
+  "active_branch":"$fresh_branch",
+  "active_pr_number":0,
+  "active_pr_url":"",
+  "active_head_sha":"",
+  "goal":"",
+  "milestone":"received",
+  "phase":"received",
+  "status":"new",
+  "state_revision":0,
+  "capabilities":{"push":false,"target":""},
+  "last_verified_sha":"",
+  "last_verified_evidence":"",
+  "created_at":"$now",
+  "updated_at":"$now",
+  "last_processed_comment_id":0,
+  "current_request":"",
+  "completed_steps":[],
+  "remaining_steps":[],
+  "tests_run":[],
+  "ci_runs":[],
+  "research_sources":[],
+  "warnings":[],
+  "artifacts":[],
+  "next_action":"classify request",
+  "durable_work":false,
+  "target_repository":"$target_repo",
+  "target_base":"$target_base",
+  "target_branch":"$target_branch",
+  "last_run_id":null,
+  "agent_attempt":null,
+  "termination_reason":null,
+  "last_checkpoint_at":"$now"
+}
+EOF
+)"
+      export_state "$json"
+      emit_env OC_SESSION_MEMORY_PERSISTED false
+      emit_env OC_SESSION_EXISTS false
+      echo "Started fresh /oc session $fresh_session_id on $fresh_branch"
+      exit 0
+    fi
     body="$(issue_body || true)"
     json="$(extract_block "$body" "$memory_marker" "$memory_end" | sed -n '/^STATE-BEGIN$/,/^STATE-END$/p' | sed '1d;$d')"
     expected_target="${OC_TARGET_REPO:-}"
@@ -115,6 +172,7 @@ case "$cmd" in
     if validate_candidate "$json"; then
       export_state "$json"
       emit_env OC_SESSION_MEMORY_PERSISTED true
+      emit_env OC_SESSION_EXISTS true
       echo "Loaded durable session memory $(jq -r '.session_id' "$state_file")"
       exit 0
     fi
@@ -127,6 +185,7 @@ case "$cmd" in
         printf '%s\n' "$legacy_json" > "$state_file"
         export_state "$legacy_json"
         emit_env OC_SESSION_MEMORY_PERSISTED false
+        emit_env OC_SESSION_EXISTS true
         remove_legacy_comment || true
         echo "Loaded legacy session memory $(jq -r '.session_id' "$state_file")"
         exit 0
@@ -147,6 +206,7 @@ case "$cmd" in
     }')"
     export_state "$json"
     emit_env OC_SESSION_MEMORY_PERSISTED false
+    emit_env OC_SESSION_EXISTS false
     ;;
   save|checkpoint)
     [[ -f "$state_file" ]] || exit 0
