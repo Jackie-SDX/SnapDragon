@@ -67,7 +67,13 @@ else
   if [[ -n "$answer" ]]; then
     final_response_captured=true
     emit_env OC_FINAL_RESPONSE_CAPTURED true
-    body="$(printf "%s\n## /oc\n\n%s" "$marker" "$answer")"
+    native_note=""
+    native_id="$(printenv OC_NATIVE_SESSION_ID || true)"
+    native_exported="$(printenv OC_NATIVE_SESSION_EXPORTED || true)"
+    if [[ "$native_exported" == "true" && "$native_id" =~ ^ses_[A-Za-z0-9_-]+$ ]]; then
+      native_note="$(printf "\n\nNative OpenCode session: %s\nResume automatically with the next /oc request." "$native_id")"
+    fi
+    body="$(printf "%s\n## /oc\n\n%s%s" "$marker" "$answer" "$native_note")"
   elif [[ "$a1" == "success" ]]; then
     body="$(printf "%s\n## /oc\nOpenCode completed, but its final response was not captured." "$marker")"
   else
