@@ -120,7 +120,10 @@ elif [[ "${CL1:-false}" == "true" ]]; then
   bash .github/scripts/record-oc-session-progress.sh >/dev/null 2>&1 || true
 fi
 
-memory_persisted="$(sed -nE 's/^memory_persisted=//p' "${GITHUB_OUTPUT:-/dev/null}" 2>/dev/null | tail -n 1)"
+memory_persisted="$(printenv OC_SESSION_MEMORY_PERSISTED || true)"
+if [[ -z "$memory_persisted" ]]; then
+  memory_persisted="$(sed -nE 's/^memory_persisted=//p' "${GITHUB_OUTPUT:-/dev/null}" 2>/dev/null | tail -n 1)"
+fi
 if [[ "$memory_persisted" != "true" ]]; then
   emit_env OC_SESSION_MEMORY_PERSISTED false
   echo "::error title=Session memory not verified::Result was published, but durable session memory was not verified. The next run can reconstruct from issue/PR history, Git, and live CI." >&2

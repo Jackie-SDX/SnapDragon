@@ -16,8 +16,8 @@ gh_stub="$tmp/gh-bin"
 cat > "$gh_stub" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-filter=""
 endpoint=""
+filter=""
 while (( $# )); do
   case "$1" in
     --paginate) shift ;;
@@ -41,13 +41,11 @@ case "$endpoint" in
   /repos/MangaD/cpp-project-template/issues/7/comments?*)
     data='[]'
     ;;
+  /repos/example/repo/actions/runs) data='{"workflow_runs":[]}' ;;
   *) data='[]' ;;
 esac
-if [[ -n "$filter" ]]; then
-  jq -r "$filter" <<<"$data"
-else
-  printf '%s\n' "$data"
-fi
+if [[ -n "$filter" && "$filter" == *'@base64'* && "$data" == '[]' ]]; then exit 0; fi
+printf '%s\n' "$data"
 EOF
 chmod +x "$gh_stub"
 bin="$tmp/bin"
@@ -62,7 +60,7 @@ PATH="$bin:$PATH" RUNNER_TEMP="$tmp/runner" GITHUB_REPOSITORY="example/repo" TAR
 rc=$?
 set -e
 [[ "$rc" == "0" ]] || { echo "collect context regression failed rc=$rc"; cat "$tmp/collect-log"; exit 1; }
-grep -Fq 'Captured complete issue context:' "$tmp/collect-log"
+grep -Fq 'On-demand /oc context collected:' "$tmp/collect-log"
 context_file="$(sed -n 's/^OC_ISSUE_CONTEXT_FILE=//p' "$out")"
 refs_file="$(sed -n 's/^OC_REFERENCE_CONTEXT_FILE=//p' "$out")"
 test -s "$context_file"
