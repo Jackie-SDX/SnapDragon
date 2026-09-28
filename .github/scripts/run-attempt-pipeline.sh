@@ -35,7 +35,7 @@ native_session_artifact="$(read_back native_session_artifact)"
 [[ -n "$native_session_id" ]] && printf 'OC_NATIVE_SESSION_ID=%s\n' "$native_session_id" >> "${GITHUB_ENV:-/dev/null}"
 [[ -n "$native_session_export_file" ]] && printf 'OC_NATIVE_SESSION_EXPORT_FILE=%s\n' "$native_session_export_file" >> "${GITHUB_ENV:-/dev/null}"
 [[ -n "$native_session_artifact" ]] && printf 'OC_NATIVE_SESSION_ARTIFACT=%s\n' "$native_session_artifact" >> "${GITHUB_ENV:-/dev/null}"
-if [[ -n "$native_session_id" ]]; then
+if [[ -n "$native_session_id" && -n "$native_session_export_file" && -n "$native_session_artifact" ]]; then
   printf 'OC_NATIVE_SESSION_RUN_ID=%s\n' "${GITHUB_RUN_ID:-}" >> "${GITHUB_ENV:-/dev/null}"
   printf 'OC_NATIVE_SESSION_EXPORTED=true\n' >> "${GITHUB_ENV:-/dev/null}"
 fi

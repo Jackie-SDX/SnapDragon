@@ -461,7 +461,7 @@ if [[ "$native_session_id" =~ ^ses_[A-Za-z0-9_-]+$ && -n "$agent_cwd" && -d "$ag
   native_session_export_file="$runner_temp/opencode-native-session-${attempt}-${TARGET_NUMBER:-0}.json"
   native_session_artifact="opencode-native-session-${TARGET_NUMBER:-0}-${native_session_id}"
   if (cd "$agent_cwd" && opencode export "$native_session_id" > "$native_session_export_file" 2>/dev/null) && [[ -s "$native_session_export_file" ]]; then
-    printf "native_session_id=%s\n" "$native_session_id" >> "$output_file"
+    printf "native_session_id=\n" >> "$output_file"
     printf "native_session_export_file=%s\n" "$native_session_export_file" >> "$output_file"
     printf "native_session_artifact=%s\n" "$native_session_artifact" >> "$output_file"
     printf "OC_NATIVE_SESSION_ID=%s\n" "$native_session_id" >> "${GITHUB_ENV:-/dev/null}"
