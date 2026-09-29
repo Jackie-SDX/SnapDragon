@@ -69,7 +69,7 @@ BEGIN {
   if (line ~ /^✗[[:space:]]*Error:/) { emit(red(line)); suppress_command_output=0; next }
   if (line ~ /^⚠[[:space:]]*Warning:/) { emit(bright_orange(line)); suppress_command_output=0; next }
   if (line ~ /^\[OPENCODE\][[:space:]]+(session started|session idle|tool|edited)/) { next }
-  if (line ~ /^Thinking:[[:space:]]*/) { emit(purple("🧠 : Agent reasoning")); suppress_command_output=0; next }
+  if (line ~ /^Thinking:[[:space:]]*/) { msg=line; sub(/^Thinking:[[:space:]]*/, "", msg); if(msg!="") emit(light_blue("💭 : " msg)); suppress_command_output=0; next }
 
   if (line ~ /OC-STATUS:[[:space:]]*/) { msg=status_text(line,"^.*OC-STATUS:[[:space:]]*"); if(msg!="") emit(light_blue("💭 : " msg)); suppress_command_output=0; next }
   if (line ~ /OC-PLAN:[[:space:]]*/) { msg=status_text(line,"^.*OC-PLAN:[[:space:]]*"); if(msg!="") emit(light_blue("💭 : " msg)); suppress_command_output=0; next }
