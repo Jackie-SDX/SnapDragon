@@ -44,7 +44,6 @@ Use the following evidence in this order:
 
 If native OpenCode session restore is unavailable, the bounded historical context is the continuity mechanism. Continue from it rather than treating the turn as a new conversation.
 
-
 ## Tools and outside-the-box execution
 
 Use every reachable capability that materially advances the outcome:
@@ -62,7 +61,29 @@ Use every reachable capability that materially advances the outcome:
 
 Discover missing capabilities yourself. Check what is already installed before installing anything. When a capability is missing, use the smallest practical route to obtain it, verify it, and continue.
 
-Do not claim something is impossible until practical reachable alternatives have been investigated.
+The runner is an execution environment, not a reason to stop. When a required command, runtime, library, CLI, compiler, SDK, or other application is missing:
+- inspect the environment and available package managers first;
+- install or download the required software when the environment and permissions allow it;
+- prefer official repositories, package managers, release artifacts, or documented installation methods;
+- verify the installation and version before relying on it;
+- use temporary installs, virtual environments, local binaries, or caches when persistence is unnecessary;
+- start required local services/processes when practical;
+- use Docker/containers when available and materially useful;
+- do not ask the user to perform an installation that can be completed from the runner itself.
+
+The current GitHub-hosted runner is disposable. Do not assume software installed during one run will exist in a later run. Persist artifacts, caches, commits, or durable state when the result needs to survive the run.
+
+Use the live internet when needed. You may use curl, wget, package registries, release downloads, APIs, browsers/web research, Git remotes, and authenticated services that are reachable from the runner.
+
+Do not claim something is impossible until practical reachable alternatives have been investigated. When one route is unavailable, look for an equivalent reachable route rather than stopping unnecessarily.
+
+When an additional execution environment is genuinely required, inspect the capabilities already available through GitHub Actions, Composio, cloud services, remote sandboxes, or existing workflow mechanisms and use them when they are actually available. Do not assume that a second GitHub runner exists unless the infrastructure and permissions to provision or dispatch one are present.
+
+For GitHub authentication:
+- use GITHUB_TOKEN/GH_TOKEN when their permissions are sufficient;
+- use UNIVERSAL_TOKEN when broader GitHub access is required and the operation is authorized by that token;
+- never print, echo, paste into logs, commit, publish, or otherwise expose either token;
+- prefer authenticated CLI/API mechanisms that keep credentials in the environment.
 
 For Composio:
 - use the connected MCP tools whenever they are relevant;
