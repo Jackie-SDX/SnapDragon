@@ -26,7 +26,7 @@ git -C "$dir" commit -m "checkpoint(oc): preserve session progress (attempt $att
   exit 0
 }
 checkpoint_sha="$(git -C "$dir" rev-parse HEAD)"
-if oc_git_push -C "$dir" origin "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+if (cd "$dir" && oc_git_push origin "HEAD:refs/heads/$branch") >/dev/null 2>&1; then
   printf "OC_CHECKPOINT_SHA=%s\n" "$checkpoint_sha" >> "${GITHUB_ENV:-/dev/null}"
   printf "checkpoint_sha=%s\n" "$checkpoint_sha" >> "${GITHUB_OUTPUT:-/dev/null}"
   echo "Durable checkpoint pushed: $branch @ $checkpoint_sha"

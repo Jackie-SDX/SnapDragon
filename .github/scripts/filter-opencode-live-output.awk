@@ -8,6 +8,8 @@ function green(s) { return color("\033[92m",s) }
 function dark_green(s) { return color("\033[32m",s) }
 function cyan(s) { return color("\033[96m",s) }
 function purple(s) { return color("\033[38;5;141m",s) }
+function light_blue(s) { return color("\033[38;5;117m",s) }
+function agent_teal(s) { return color("\033[38;5;121m",s) }
 function blue(s) { return color("\033[94m",s) }
 function orange(s) { return color("\033[38;5;208m",s) }
 function bright_orange(s) { return color("\033[38;5;214m",s) }
@@ -53,6 +55,9 @@ BEGIN {
 {
   line=clean_line($0)
 
+  if (line ~ /^🧠[[:space:]]*:/) { emit(purple(line)); suppress_command_output=0; next }
+  if (line ~ /^💭[[:space:]]*:/) { emit(light_blue(line)); suppress_command_output=0; next }
+  if (line ~ /^👾[[:space:]]*:/) { emit(agent_teal(line)); suppress_command_output=0; next }
   if (line ~ /^🤖[[:space:]]*:/) { emit(purple(line)); suppress_command_output=0; next }
   if (line ~ /^⚡[[:space:]]*Ran command/) { emit(dark_green(line)); suppress_command_output=0; next }
   if (line ~ /^✓[[:space:]]*(bash|shell|read|Read|edit|Edit|write|Write|patch|Patch|grep|Grep|glob|Glob|websearch|WebSearch|webfetch|WebFetch|search)[[:space:]]+completed/) { emit(green(line)); suppress_command_output=0; next }
@@ -64,10 +69,10 @@ BEGIN {
   if (line ~ /^✗[[:space:]]*Error:/) { emit(red(line)); suppress_command_output=0; next }
   if (line ~ /^⚠[[:space:]]*Warning:/) { emit(bright_orange(line)); suppress_command_output=0; next }
   if (line ~ /^\[OPENCODE\][[:space:]]+(session started|session idle|tool|edited)/) { next }
-  if (line ~ /^Thinking:[[:space:]]*/) { emit(purple("◆ " line)); suppress_command_output=0; next }
+  if (line ~ /^Thinking:[[:space:]]*/) { emit(purple("🧠 : Agent reasoning")); suppress_command_output=0; next }
 
-  if (line ~ /OC-STATUS:[[:space:]]*/) { msg=status_text(line,"^.*OC-STATUS:[[:space:]]*"); if(msg!="") emit(green("▶ " msg)); suppress_command_output=0; next }
-  if (line ~ /OC-PLAN:[[:space:]]*/) { msg=status_text(line,"^.*OC-PLAN:[[:space:]]*"); if(msg!="") emit(cyan("◆ " msg)); suppress_command_output=0; next }
+  if (line ~ /OC-STATUS:[[:space:]]*/) { msg=status_text(line,"^.*OC-STATUS:[[:space:]]*"); if(msg!="") emit(light_blue("💭 : " msg)); suppress_command_output=0; next }
+  if (line ~ /OC-PLAN:[[:space:]]*/) { msg=status_text(line,"^.*OC-PLAN:[[:space:]]*"); if(msg!="") emit(light_blue("💭 : " msg)); suppress_command_output=0; next }
   if (line ~ /OC-DONE:[[:space:]]*/) { msg=status_text(line,"^.*OC-DONE:[[:space:]]*"); if(msg!="") emit(green("✓ " msg)); suppress_command_output=0; next }
 
   if (line ~ /^\[OC\]\[PHASE/) { phase=line; sub(/^\[OC\]\[PHASE[^]]*\][[:space:]]*/,"",phase); emit(green("━━ " phase)); suppress_command_output=0; next }
@@ -113,14 +118,14 @@ BEGIN {
     next
   }
 
-  if (line ~ /^⚙[[:space:]]+/) { summary=tool_summary(line); if(summary!="") emit(purple("◆ Tool: " summary)); next }
+  if (line ~ /^⚙[[:space:]]+/) { summary=tool_summary(line); if(summary!="") emit(agent_teal("👾 : " summary)); next }
 
   if (line ~ /^[[:space:]]*\|[[:space:]]+(Read|Edit|Write|Patch|Shell|Glob|Grep|WebFetch|WebSearch)([[:space:]]|$)/) {
     toolline=line; sub(/^[[:space:]]*\|[[:space:]]+/,"",toolline); split(toolline,fields,/[[:space:]]+/); tool=fields[1]
     if(tool in tool_event) {
-      if(tool=="Shell") emit(orange("→ " tool_event[tool]))
-      else if(tool=="Read" || tool=="Edit" || tool=="Write" || tool=="Patch") emit(purple("• " tool_event[tool]))
-      else emit(blue("• " tool_event[tool]))
+      if(tool=="Shell") emit(agent_teal("👾 : " tool_event[tool]))
+      else if(tool=="Read" || tool=="Edit" || tool=="Write" || tool=="Patch") emit(agent_teal("👾 : " tool_event[tool]))
+      else emit(agent_teal("👾 : " tool_event[tool]))
     }
     next
   }
