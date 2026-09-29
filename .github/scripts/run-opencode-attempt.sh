@@ -261,8 +261,7 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
               printf '✓ %s completed\n' "$tool_name" >&3
             fi ;;
         esac ;;
-      step_start)
-        printf '💭 : Agent planning\n' >&3 ;;
+      step_start) : ;;
       step_finish) : ;;
       error)
         error_text="$(jq -r '.error.data.message // .error.message // empty' <<<"$raw_line")"
