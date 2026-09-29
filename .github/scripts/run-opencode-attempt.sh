@@ -236,32 +236,32 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
           printf '📄 Final response captured\n' >&3
         fi ;;
       reasoning)
-        event_text="$(jq -r '.part.text // empty' <<<"$raw_line")"
-        [[ -n "$event_text" ]] && printf '🤖 : %s\n' "$(sanitize_line "$event_text")" >&3 ;;
+        [[ -n "$(jq -r '.part.text // empty' <<<"$raw_line")" ]] && printf '🧠 : Agent reasoning\n' >&3 ;;
       tool_use)
         tool_name="$(jq -r '.part.tool // empty' <<<"$raw_line")"
         tool_status="$(jq -r '.part.state.status // empty' <<<"$raw_line")"
         case "$tool_name" in
           bash|shell)
-            printf '⚡ Ran command\n' >&3
+            printf '👾 : Ran command\n' >&3
             [[ "$tool_status" == "completed" ]] && printf '✓ %s completed\n' "$tool_name" >&3 ;;
           read|Read|file_read)
-            printf '📖 Read file\n' >&3
+            printf '👾 : Read file\n' >&3
             [[ "$tool_status" == "completed" ]] && printf '✓ %s completed\n' "$tool_name" >&3 ;;
           edit|Edit|write|Write|patch|Patch)
-            printf '✎ Edit file\n' >&3
+            printf '👾 : Edit file\n' >&3
             [[ "$tool_status" == "completed" ]] && printf '✓ %s completed\n' "$tool_name" >&3 ;;
           grep|Grep|glob|Glob|websearch|WebSearch|webfetch|WebFetch|search)
-            printf '⌕ Search\n' >&3
+            printf '👾 : Search\n' >&3
             [[ "$tool_status" == "completed" ]] && printf '✓ %s completed\n' "$tool_name" >&3 ;;
           *)
-            printf '◆ Tool call\n' >&3
+            printf '👾 : Tool call\n' >&3
             if [[ "$tool_status" == "completed" ]]; then
               [[ -n "$tool_name" ]] || tool_name=tool
               printf '✓ %s completed\n' "$tool_name" >&3
             fi ;;
         esac ;;
-      step_start) : ;;
+      step_start)
+        printf '💭 : Agent planning\n' >&3 ;;
       step_finish) : ;;
       error)
         error_text="$(jq -r '.error.data.message // .error.message // empty' <<<"$raw_line")"
