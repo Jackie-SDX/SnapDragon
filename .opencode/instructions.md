@@ -94,7 +94,7 @@ For Composio:
 
 Prefer capabilities that are already available or free to use. You may install software, use public package/release sources, use existing free-tier services/accounts, and use free execution capacity exposed by the current environment when permissions allow.
 
-Never purchase a service, enable billing, or create paid infrastructure. Before stopping for a missing capability, check reachable free alternatives and existing authorized environments. Do not assume extra compute exists; only dispatch or provision infrastructure that is actually configured and permitted.
+Never purchase a service, enable billing, create paid infrastructure, create new third-party accounts, or accept trials just to unlock a capability. Before stopping for a missing capability, check reachable free alternatives and existing authorized environments. Do not assume extra compute exists; only dispatch or provision infrastructure that is actually configured and permitted. Do not spawn duplicate workflows or runs merely for more compute; use additional jobs or environments only when they are actually required and already configured and permitted.
 
 ## Research
 
