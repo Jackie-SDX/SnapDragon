@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Three Seeds</string>
+    <string name="tagline">A 3-seed strategy game</string>
+
+    <!-- Main menu -->
+    <string name="menu_play">Play</string>
+    <string name="menu_play_local">Pass &amp; Play</string>
+    <string name="menu_play_ai">Vs Computer</string>
+    <string name="menu_profile_summary">%1$d coins · %2$d wins · %3$d losses · %4$d draws</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_about">About</string>
+    <string name="about_body">Each player has 3 seeds. Place them, then send any seed to any vacant point, trying to line up all 3 in a row. First to align a row, column, or diagonal wins. If the same position repeats 3 times, it\'s a draw. Want the stricter classic variant? Switch on Tapatan-style movement in Settings.</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_author">Created by Jackie (Jackie-SDX)</string>
+    <string name="about_source">Source code: github.com/Jackie-SDX/SnapDragon</string>
+    <string name="close">Close</string>
+
+    <!-- Game screen -->
+    <string name="turn_placement">Player %1$d: place a seed</string>
+    <string name="turn_movement">Player %1$d: move a seed</string>
+    <string name="seeds_remaining">%1$d left to place</string>
+    <string name="seeds_on_board">Player %1$d has %2$d on the board</string>
+    <string name="restart">Restart</string>
+    <string name="restart_confirm_title">Restart the game?</string>
+    <string name="restart_confirm_body">This clears the board and starts over.</string>
+    <string name="undo">Undo</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="paused_title">Paused</string>
+    <string name="main_menu">Main menu</string>
+    <string name="debug_toggle">Debug info</string>
+
+    <!-- Victory / draw overlay -->
+    <string name="player_wins">Player %1$d wins!</string>
+    <string name="draw_title">It\'s a draw</string>
+    <string name="draw_body">Same position, three times over — nobody can force a win from here.</string>
+    <string name="play_again">Play again</string>
+
+    <!-- Settings -->
+    <string name="settings_sound">Sound effects</string>
+    <string name="settings_haptics">Haptic feedback</string>
+    <string name="settings_adjacent">Tapatan-style movement</string>
+    <string name="settings_adjacent_description">Seeds slide only along drawn lines. Off: move to any vacant point (the standard rule).</string>
+    <string name="settings_debug">Debug mode</string>
+    <string name="settings_debug_description">Shows the raw game state on the game screen</string>
+
+    <!-- Tap feedback -->
+    <string name="hint_blocked_path">That point is not reachable along a drawn line right now</string>
+    <string name="hint_opponent_seed">That seed belongs to the other player</string>
+    <string name="hint_boxed_in">That seed has nowhere to go — pick another one</string>
+    <string name="hint_occupied">That point is already taken</string>
+    <string name="hint_illegal">That move is not allowed</string>
+    <string name="rules_free">Any vacant point</string>
+    <string name="rules_tapatan">Lines only</string>
+
+    <!-- Computer opponent -->
+    <string name="ai_thinking">The computer is thinking…</string>
+    <string name="turn_computer_place">Computer: place a seed</string>
+    <string name="turn_computer_move">Computer: move a seed</string>
+    <string name="seeds_computer">Computer has %1$d on the board</string>
+    <string name="computer_wins">Computer wins!</string>
+    <string name="you_win">You win!</string>
+    <string name="settings_ai_title">Computer opponent</string>
+    <string name="settings_ai_description">How strong, how it plays, and how long it thinks, in Vs Computer mode.</string>
+    <string name="settings_difficulty">Difficulty</string>
+    <string name="difficulty_beginner">Beginner</string>
+    <string name="difficulty_easy">Easy</string>
+    <string name="difficulty_medium">Medium</string>
+    <string name="difficulty_hard">Hard</string>
+    <string name="difficulty_expert">Expert</string>
+    <string name="difficulty_master">Master</string>
+    <string name="settings_personality">Personality</string>
+    <string name="personality_balanced">Balanced</string>
+    <string name="personality_aggressive">Aggressive</string>
+    <string name="personality_defensive">Defensive</string>
+    <string name="personality_positional">Positional</string>
+    <string name="personality_experimental">Experimental</string>
+    <string name="settings_think_speed">Thinking time</string>
+    <string name="think_speed_instant">Instant</string>
+    <string name="think_speed_natural">Natural</string>
+    <string name="think_speed_thoughtful">Thoughtful</string>
+
+    <!-- Themes &amp; economy -->
+    <string name="settings_themes">Board themes</string>
+    <string name="settings_dynamic_themes">Dynamic themes</string>
+    <string name="settings_dynamic_themes_description">Hop through unlocked themes every few seconds during play.</string>
+    <string name="settings_coins">Coins: %1$d</string>
+    <string name="theme_cost">%1$s · %2$d</string>
+    <string name="not_enough_coins">Not enough coins — you need %1$d.</string>
+    <string name="coins_earned">+%1$d coins</string>
+
+    <!-- Statistics -->
+    <string name="stats_title">Statistics</string>
+    <string name="stats_wins">Wins</string>
+    <string name="stats_losses">Losses</string>
+    <string name="stats_draws">Draws</string>
+    <string name="stats_streak">Win streak</string>
+    <string name="stats_best_streak">Best streak</string>
+
+    <!-- Accessibility -->
+    <string name="cd_board">Game board</string>
+    <string name="cd_point_empty">Point %1$d, empty</string>
+    <string name="cd_point_occupied">Point %1$d, Player %2$d\'s seed</string>
+    <string name="cd_point_selected">Point %1$d, Player %2$d\'s seed, selected</string>
+    <string name="cd_point_legal_destination">Point %1$d, empty, legal move</string>
+    <string name="cd_point_winning">Point %1$d, Player %2$d\'s seed, part of the winning line</string>
+</resources>

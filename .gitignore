@@ -29,3 +29,19 @@ agent-eval-results.jsonl
 # OS / editor noise
 .DS_Store
 Thumbs.db
+# Android / Gradle build outputs and local SDK state
+.gradle/
+build/
+*/build/
+.idea/
+*.iml
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Release signing — never commit these
+*.keystore
+*.jks
+keystore.properties
+
