@@ -236,7 +236,8 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
           printf '📄 Final response captured\n' >&3
         fi ;;
       reasoning)
-        [[ -n "$(jq -r '.part.text // empty' <<<"$raw_line")" ]] && printf '🧠 : Agent reasoning\n' >&3 ;;
+        event_text="$(jq -r '.part.text // empty' <<<"$raw_line")"
+        [[ -n "$event_text" ]] && printf '🧠 : %s\n' "$(sanitize_line "$event_text")" >&3 ;;
       tool_use)
         tool_name="$(jq -r '.part.tool // empty' <<<"$raw_line")"
         tool_status="$(jq -r '.part.state.status // empty' <<<"$raw_line")"
