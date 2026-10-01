@@ -20,7 +20,9 @@ enum class Motif {
     FLOWERS,
     SCALES,
     CONFETTI,
-    GEOMETRIC
+    GEOMETRIC,
+    DRAGON,
+    FOUNTAIN
 }
 
 /**

@@ -77,9 +77,11 @@ private fun ThemeMotifLayer(theme: GameTheme, modifier: Modifier = Modifier) {
 
     Canvas(modifier = modifier) {
         val dim = size.minDimension
+        if (theme.motif == Motif.FOUNTAIN) drawFountainBasin(theme, dim)
         for (p in particles) {
             drawParticle(theme, p, progress, dim)
         }
+        if (theme.motif == Motif.DRAGON) drawDragon(theme, progress, dim)
     }
 }
 
@@ -91,6 +93,8 @@ private fun particlesFor(motif: Motif): List<Particle> {
         Motif.SCALES -> 24
         Motif.GEOMETRIC -> 26
         Motif.RAIN -> 44
+        Motif.DRAGON -> 22
+        Motif.FOUNTAIN -> 45
         else -> 30
     }
     val rng = Random(motif.ordinal * 7919 + 13)
@@ -155,13 +159,14 @@ private fun DrawScope.drawParticle(theme: GameTheme, p: Particle, t: Float, dim:
             )
         }
 
-        Motif.SNOW, Motif.PETALS, Motif.LEAVES, Motif.CONFETTI, Motif.EMBERS, Motif.BUBBLES -> {
-            val rising = theme.motif == Motif.EMBERS || theme.motif == Motif.BUBBLES
+        Motif.SNOW, Motif.PETALS, Motif.LEAVES, Motif.CONFETTI, Motif.EMBERS, Motif.BUBBLES, Motif.DRAGON -> {
+            val rising =
+                theme.motif == Motif.EMBERS || theme.motif == Motif.BUBBLES || theme.motif == Motif.DRAGON
             val raw = if (rising) 1f - ((p.y + t * p.speed * 0.5f) % 1f) else (p.y + t * p.speed * 0.5f) % 1f
             val x = (p.x + sway * 0.03f) * size.width
             val y = raw * size.height
             val alpha = when (theme.motif) {
-                Motif.EMBERS -> 0.3f + 0.6f * abs(sin(t * 14f + p.phase))
+                Motif.EMBERS, Motif.DRAGON -> 0.3f + 0.6f * abs(sin(t * 14f + p.phase))
                 Motif.BUBBLES -> 0.25f
                 else -> 0.55f
             }
@@ -189,10 +194,36 @@ private fun DrawScope.drawParticle(theme: GameTheme, p: Particle, t: Float, dim:
                     drawRect(shapeColor, Offset(x - base, y - base * 0.5f), Size(base * 2f, base))
                 }
 
-                Motif.EMBERS -> drawCircle(shapeColor, base * 0.6f, Offset(x, y))
+                Motif.EMBERS, Motif.DRAGON -> drawCircle(shapeColor, base * 0.6f, Offset(x, y))
 
                 else -> Unit
             }
+        }
+
+        Motif.FOUNTAIN -> {
+            // Ballistic droplets: three jets launch on staggered phases and
+            // fall back through the basin, fading in and out along the arc.
+            val s = (t * 1.5f + p.hueShift) % 1f
+            val jet = ((p.phase / 6.283f) * 3f).toInt().coerceIn(0, 2)
+            val vx = (jet - 1) * 0.16f + (p.x - 0.5f) * 0.05f
+            // The centre jet climbs higher than the two side jets.
+            val vy = if (jet == 1) -1.35f - p.speed * 0.25f else -1.02f - p.speed * 0.2f
+            val g = 2.5f
+            val x = size.width / 2f + vx * s * size.width
+            val y = size.height * 0.765f + (vy * s + 0.5f * g * s * s) * size.height
+            val alpha = 0.85f * sin(Math.PI.toFloat() * s)
+            val dirX = vx * size.width
+            val dirY = (vy + g * s) * size.height
+            val mag = kotlin.math.sqrt(dirX * dirX + dirY * dirY).coerceAtLeast(1f)
+            val tail = unit * 0.03f
+            val c = color.copy(alpha = alpha * 0.65f)
+            drawLine(
+                c,
+                Offset(x, y),
+                Offset(x - dirX / mag * tail, y - dirY / mag * tail),
+                unit * 0.0045f
+            )
+            drawCircle(color.copy(alpha = alpha), unit * 0.0065f * p.scale, Offset(x, y))
         }
 
         Motif.FLOWERS -> {
@@ -255,5 +286,131 @@ private fun DrawScope.drawParticle(theme: GameTheme, p: Particle, t: Float, dim:
                 )
             }
         }
+    }
+}
+
+/** Static fountain furniture: nozzle, basin, pedestal, and pool. */
+private fun DrawScope.drawFountainBasin(theme: GameTheme, dim: Float) {
+    val color = theme.motifColor
+    val cx = size.width / 2f
+    val baseY = size.height * 0.78f
+    drawArc(
+        color = color.copy(alpha = 0.28f),
+        startAngle = 0f,
+        sweepAngle = 180f,
+        useCenter = false,
+        topLeft = Offset(cx - dim * 0.30f, baseY - dim * 0.10f),
+        size = Size(dim * 0.60f, dim * 0.20f),
+        style = Stroke(dim * 0.010f),
+    )
+    drawLine(
+        color.copy(alpha = 0.20f),
+        Offset(cx, baseY + dim * 0.09f),
+        Offset(cx, baseY + dim * 0.22f),
+        dim * 0.014f,
+    )
+    drawLine(
+        color.copy(alpha = 0.16f),
+        Offset(cx - dim * 0.42f, baseY + dim * 0.22f),
+        Offset(cx + dim * 0.42f, baseY + dim * 0.22f),
+        dim * 0.008f,
+    )
+    drawCircle(color.copy(alpha = 0.35f), dim * 0.016f, Offset(cx, baseY - dim * 0.02f))
+}
+
+/** One full sine-glide sweep across the screen; u=0 and u=1 match, so the loop never jumps. */
+private fun dragonAt(u: Float, width: Float, height: Float): Offset {
+    val x = (-0.18f + 1.36f * u) * width
+    val y = height * (0.40f + 0.16f * sin(u * 6.283185f + 0.4f))
+    return Offset(x, y)
+}
+
+/**
+ * The hero of the DRAGON motif: a serpentine body of tapering
+ * segments, fan wings beating at the shoulder, horns, an eye, and a
+ * flickering breath — gliding along [dragonAt] so it crosses and
+ * re-enters on every 12s cycle.
+ */
+private fun DrawScope.drawDragon(theme: GameTheme, t: Float, dim: Float) {
+    val color = theme.motifColor
+    val head = dragonAt(t, size.width, size.height)
+    val ahead = dragonAt(t + 0.004f, size.width, size.height)
+    val dir = ahead - head
+    val angle = kotlin.math.atan2(dir.y, dir.x)
+    val forward = Offset(kotlin.math.cos(angle), kotlin.math.sin(angle))
+
+    // Trailing body: thicker at the neck, tapering to the tail tip.
+    val segments = 14
+    for (i in segments downTo 1) {
+        val ui = t - i * 0.010f
+        if (ui < 0f) continue
+        val pos = dragonAt(ui, size.width, size.height)
+        val f = 1f - i.toFloat() / segments
+        val r = dim * (0.004f + 0.016f * f * f)
+        drawCircle(color.copy(alpha = 0.30f + 0.50f * f), r, pos)
+    }
+
+    // Side-view wing: one membrane above the shoulder with finger
+    // bones, plus a dimmer far wing behind the body. The flap drives
+    // the tip so the wing visibly beats on the same 12s clock.
+    val shoulder = dragonAt(t - 0.030f, size.width, size.height)
+    val up = Offset(forward.y, -forward.x)
+    val flap = sin(t * 94.2f)
+    val span = dim * 0.13f
+    val tip = shoulder + up * (span * (0.95f + 0.30f * flap)) - forward * (span * (0.55f - 0.20f * flap))
+    val back = shoulder + up * (span * 0.22f) - forward * (span * 0.95f)
+    val membrane = androidx.compose.ui.graphics.Path().apply {
+        moveTo(shoulder.x, shoulder.y)
+        quadraticTo(
+            shoulder.x + up.x * span * 1.15f - forward.x * span * 0.15f,
+            shoulder.y + up.y * span * 1.15f - forward.y * span * 0.15f,
+            tip.x,
+            tip.y,
+        )
+        quadraticTo(
+            shoulder.x + up.x * span * 0.50f - forward.x * span * 0.55f,
+            shoulder.y + up.y * span * 0.50f - forward.y * span * 0.55f,
+            back.x,
+            back.y,
+        )
+        close()
+    }
+    drawPath(membrane, color.copy(alpha = 0.28f), style = Stroke(dim * 0.005f))
+    drawLine(color.copy(alpha = 0.55f), shoulder, tip, dim * 0.005f)
+    drawLine(color.copy(alpha = 0.45f), shoulder, back, dim * 0.004f)
+    // Far wing: a dim echo sweeping back and under.
+    val farTip = shoulder - up * (span * (0.35f + 0.15f * flap)) - forward * (span * 0.85f)
+    drawLine(color.copy(alpha = 0.30f), shoulder, farTip, dim * 0.004f)
+
+    // Head, snout, swept-back horns, eye.
+    val headR = dim * 0.024f
+    drawCircle(color.copy(alpha = 0.90f), headR, head)
+    drawCircle(color.copy(alpha = 0.85f), headR * 0.55f, head + forward * (headR * 1.6f))
+    val hornBase = head - forward * (headR * 0.4f) + up * (headR * 0.5f)
+    drawLine(
+        color.copy(alpha = 0.85f),
+        hornBase,
+        hornBase - forward * (headR * 1.4f) + up * (headR * 1.1f),
+        dim * 0.004f,
+    )
+    drawLine(
+        color.copy(alpha = 0.70f),
+        hornBase - up * (headR * 0.6f),
+        hornBase - forward * (headR * 1.0f) + up * (headR * 0.3f),
+        dim * 0.0035f,
+    )
+    drawCircle(
+        Color.White.copy(alpha = 0.90f),
+        headR * 0.22f,
+        head + up * (headR * 0.30f) + forward * (headR * 0.25f),
+    )
+
+    // Breath: flickering puffs carried ahead of the snout.
+    for (k in 1..5) {
+        val d = headR * (2.0f + k * 1.15f)
+        val rr = dim * 0.015f * (1f - k * 0.15f)
+        val a = 0.65f * (1f - k * 0.15f) * (0.55f + 0.45f * abs(sin(t * 25f + k)))
+        val wobble = Offset(0f, sin(t * 20f + k) * dim * 0.008f)
+        drawCircle(color.copy(alpha = a), rr, head + forward * d + wobble)
     }
 }

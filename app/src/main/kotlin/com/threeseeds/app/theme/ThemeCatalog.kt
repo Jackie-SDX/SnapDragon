@@ -64,7 +64,7 @@ object ThemeCatalog {
             playerTwoDeep = Color(0xFFD32F2F),
             surfaceColor = Color(0xFF2B1209),
             accentColor = Color(0xFFFF6E40),
-            motif = Motif.EMBERS,
+            motif = Motif.DRAGON,
             motifColor = Color(0xFFFFAB40),
         ),
         GameTheme(
@@ -360,6 +360,23 @@ object ThemeCatalog {
             motif = Motif.SCALES,
             motifColor = Color(0xFF64FFDA),
         ),
+        GameTheme(
+            id = "fountain-court",
+            name = "Fountain Court",
+            cost = 150,
+            backgroundStops = listOf(Color(0xFF061426), Color(0xFF0E3350), Color(0xFF04101D)),
+            lineColor = Color(0xFF80DEEA),
+            lineGlowColor = Color(0x6680DEEA),
+            nodeColor = Color(0xFFB2EBF2),
+            playerOne = Color(0xFFFFF176),
+            playerOneDeep = Color(0xFFFFCA28),
+            playerTwo = Color(0xFF4FC3F7),
+            playerTwoDeep = Color(0xFF0288D1),
+            surfaceColor = Color(0xFF0B2438),
+            accentColor = Color(0xFF18FFFF),
+            motif = Motif.FOUNTAIN,
+            motifColor = Color(0xFF80DEEA),
+        ),
 
         // ---- 250 coins (4) ----
         GameTheme(
@@ -429,6 +446,23 @@ object ThemeCatalog {
             accentColor = Color(0xFFFFB74D),
             motif = Motif.BOKEH,
             motifColor = Color(0xFFD7CCC8),
+        ),
+        GameTheme(
+            id = "dragon-realm",
+            name = "Dragon Realm",
+            cost = 250,
+            backgroundStops = listOf(Color(0xFF120304), Color(0xFF3A0A10), Color(0xFF0A0203)),
+            lineColor = Color(0xFFFF7043),
+            lineGlowColor = Color(0x66FF7043),
+            nodeColor = Color(0xFFFFAB91),
+            playerOne = Color(0xFFFFD54F),
+            playerOneDeep = Color(0xFFFF8F00),
+            playerTwo = Color(0xFFFF5252),
+            playerTwoDeep = Color(0xFFC62828),
+            surfaceColor = Color(0xFF240A0C),
+            accentColor = Color(0xFFFF6E40),
+            motif = Motif.DRAGON,
+            motifColor = Color(0xFFFFB74D),
         ),
     )
 

@@ -12,10 +12,10 @@ import kotlin.test.assertTrue
 class ThemeCatalogTest {
 
     @Test
-    fun `the catalog ships 24 themes with unique ids`() {
-        assertEquals(24, ThemeCatalog.ALL.size)
-        assertEquals(24, ThemeCatalog.ALL.map { it.id }.toSet().size)
-        assertEquals(24, ThemeCatalog.ALL.map { it.name }.toSet().size)
+    fun `the catalog ships 26 themes with unique ids`() {
+        assertEquals(26, ThemeCatalog.ALL.size)
+        assertEquals(26, ThemeCatalog.ALL.map { it.id }.toSet().size)
+        assertEquals(26, ThemeCatalog.ALL.map { it.name }.toSet().size)
     }
 
     @Test
@@ -26,8 +26,8 @@ class ThemeCatalogTest {
         val counts = ThemeCatalog.ALL.groupingBy { it.cost }.eachCount()
         assertEquals(10, counts[0])
         assertEquals(5, counts[75])
-        assertEquals(5, counts[150])
-        assertEquals(4, counts[250])
+        assertEquals(6, counts[150])
+        assertEquals(5, counts[250])
 
         val legalTiers = setOf(0, 75, 150, 250)
         assertTrue(ThemeCatalog.ALL.all { it.cost in legalTiers })
