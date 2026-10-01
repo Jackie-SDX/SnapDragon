@@ -77,13 +77,24 @@ fun MainMenuScreen(
             )
 
             Text(
-                text = stringResource(
-                    R.string.menu_profile_summary,
-                    profile.coins,
-                    profile.wins,
-                    profile.losses,
-                    profile.draws
-                ),
+                text = if (profile.playerName.isBlank()) {
+                    stringResource(
+                        R.string.menu_profile_summary,
+                        profile.coins,
+                        profile.wins,
+                        profile.losses,
+                        profile.draws
+                    )
+                } else {
+                    stringResource(
+                        R.string.menu_profile_summary_named,
+                        profile.playerName,
+                        profile.coins,
+                        profile.wins,
+                        profile.losses,
+                        profile.draws
+                    )
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)

@@ -26,6 +26,8 @@ enum class ThinkSpeed(val delayMs: Long) {
  * that outlive a single match. Pure data — behavior lives in [Economy].
  */
 data class ProfileData(
+    /** Display name picked on the welcome screen; blank until registered. */
+    val playerName: String = "",
     val coins: Int = Economy.STARTING_COINS,
     /** Games won by Player One — the human seat in VS_AI. */
     val wins: Int = 0,
@@ -79,6 +81,7 @@ class ProfileRepository(context: Context) : ProfileStore {
     }
 
     private fun load(): ProfileData = ProfileData(
+        playerName = prefs.getString(KEY_PLAYER_NAME, null) ?: "",
         coins = prefs.getInt(KEY_COINS, Economy.STARTING_COINS),
         wins = prefs.getInt(KEY_WINS, 0),
         losses = prefs.getInt(KEY_LOSSES, 0),
@@ -97,6 +100,7 @@ class ProfileRepository(context: Context) : ProfileStore {
 
     private fun persist(p: ProfileData) {
         prefs.edit()
+            .putString(KEY_PLAYER_NAME, p.playerName)
             .putInt(KEY_COINS, p.coins)
             .putInt(KEY_WINS, p.wins)
             .putInt(KEY_LOSSES, p.losses)
@@ -117,6 +121,7 @@ class ProfileRepository(context: Context) : ProfileStore {
 
     private companion object {
         const val PREFS_NAME = "three_seeds_profile"
+        const val KEY_PLAYER_NAME = "player_name"
         const val KEY_COINS = "coins"
         const val KEY_WINS = "wins"
         const val KEY_LOSSES = "losses"

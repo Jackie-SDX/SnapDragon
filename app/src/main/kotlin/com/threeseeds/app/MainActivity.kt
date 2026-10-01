@@ -28,11 +28,12 @@ import com.threeseeds.app.ui.GameScreen
 import com.threeseeds.app.ui.MainMenuScreen
 import com.threeseeds.app.ui.NearbyScreen
 import com.threeseeds.app.ui.SettingsScreen
+import com.threeseeds.app.ui.WelcomeScreen
 import com.threeseeds.app.viewmodel.GameViewModel
 import com.threeseeds.app.viewmodel.GameViewModelFactory
 import kotlinx.coroutines.delay
 
-private enum class Screen { MENU, GAME, SETTINGS, NEARBY }
+private enum class Screen { WELCOME, MENU, GAME, SETTINGS, NEARBY }
 
 class MainActivity : ComponentActivity() {
 
@@ -47,7 +48,9 @@ class MainActivity : ComponentActivity() {
             settings = settings,
             soundPlayer = soundEffects,
             profile = profile,
-            localName = { android.os.Build.MODEL ?: "Player" }
+            localName = {
+                profile.data.value.playerName.ifBlank { android.os.Build.MODEL ?: "Player" }
+            }
         )
     }
 
@@ -66,7 +69,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val profileData by profile.data.collectAsState()
-            var currentScreen by rememberSaveable { mutableStateOf(Screen.MENU) }
+            // First launch (or pre-1.3 profile with no name yet): register first.
+            var currentScreen by rememberSaveable {
+                mutableStateOf(
+                    if (profileData.playerName.isBlank()) Screen.WELCOME else Screen.MENU
+                )
+            }
             val uiState by gameViewModel.uiState.collectAsState()
             val hapticTick by gameViewModel.hapticTick.collectAsState()
             val peers by gameViewModel.peers.collectAsState()
@@ -112,7 +120,7 @@ class MainActivity : ComponentActivity() {
 
             // Back steps down one screen; on the menu the system default
             // (close the app) takes over.
-            BackHandler(enabled = currentScreen != Screen.MENU) {
+            BackHandler(enabled = currentScreen != Screen.MENU && currentScreen != Screen.WELCOME) {
                 if (currentScreen == Screen.GAME) gameViewModel.leaveLink()
                 currentScreen = Screen.MENU
             }
@@ -121,6 +129,13 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalGameTheme provides theme) {
                     ThemedBackground(theme = theme) {
                         when (currentScreen) {
+                            Screen.WELCOME -> WelcomeScreen(
+                                onDone = { chosen ->
+                                    profile.update { it.copy(playerName = chosen) }
+                                    currentScreen = Screen.MENU
+                                }
+                            )
+
                             Screen.MENU -> MainMenuScreen(
                                 profile = profileData,
                                 onPlayLocal = {
