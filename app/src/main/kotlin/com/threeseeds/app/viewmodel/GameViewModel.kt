@@ -4,6 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.threeseeds.app.audio.SoundPlayer
+import com.threeseeds.app.net.LinkKind
+import com.threeseeds.app.net.LinkPeer
+import com.threeseeds.app.net.LinkSession
+import com.threeseeds.app.net.StreamLineTransport
+import com.threeseeds.app.net.WifiLan
+import com.threeseeds.app.net.asLineTransport
 import com.threeseeds.app.profile.Economy
 import com.threeseeds.app.profile.InMemoryProfileStore
 import com.threeseeds.app.profile.ProfileStore
@@ -11,6 +17,7 @@ import com.threeseeds.app.settings.SettingsStore
 import com.threeseeds.app.state.GameMode
 import com.threeseeds.app.state.GameStateCodec
 import com.threeseeds.app.state.GameUiState
+import com.threeseeds.app.state.LinkStatus
 import com.threeseeds.app.state.UiHint
 import com.threeseeds.engine.GameEngine
 import com.threeseeds.engine.GameEvent
@@ -31,6 +38,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.Closeable
 
 class GameViewModel(
     private val savedStateHandle: SavedStateHandle,
@@ -43,6 +51,8 @@ class GameViewModel(
     private val aiDelayMsOverride: Long? = null,
     /** Fixed RNG seed for the AI; tests pass a constant, the app passes null (time-based). */
     private val aiSeedOverride: Long? = null,
+    /** Name this device advertises in nearby play. */
+    private val localName: () -> String = { "Player" },
 ) : ViewModel() {
 
     /**
@@ -71,6 +81,16 @@ class GameViewModel(
 
     private var aiJob: Job? = null
 
+    // ---- Nearby play (WiFi / Bluetooth) -----------------------------------
+    /** The live link session once a nearby match is connected; null in every other mode. */
+    private var link: LinkSession? = null
+
+    /** Running host listener or scan; closed by leaveLink(). */
+    private var linkHandle: Closeable? = null
+
+    /** Host-side ruleset frozen at match start; guest-side adopted from WELCOME. */
+    private var networkRules: MovementRules? = null
+
     private val _uiState = MutableStateFlow(
         GameUiState(
             gameState = engine.state,
@@ -80,10 +100,26 @@ class GameViewModel(
             gameMode = initialMode,
             soundEnabled = settings.soundEnabled,
             hapticsEnabled = settings.hapticsEnabled,
-            debugModeEnabled = settings.debugModeEnabled
+            debugModeEnabled = settings.debugModeEnabled,
+            // A nearby match cannot survive process death: sockets are gone,
+            // so the restored board reports the link as lost.
+            linkStatus = if (initialMode.isNearby) LinkStatus.LOST else LinkStatus.NONE,
+            mySeat = when (initialMode) {
+                GameMode.NEARBY_HOST -> Player.ONE
+                GameMode.NEARBY_GUEST -> Player.TWO
+                else -> null
+            }
         )
     )
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
+
+    /** Discovered nearby hosts, refreshed while scanning. */
+    private val _peers = MutableStateFlow<List<LinkPeer>>(emptyList())
+    val peers: StateFlow<List<LinkPeer>> = _peers.asStateFlow()
+
+    /** Last lobby-level error (permission, adapter off, dial failed). */
+    private val _linkError = MutableStateFlow<String?>(null)
+    val linkError: StateFlow<String?> = _linkError.asStateFlow()
 
     /** Incremented once per haptic-worthy event; the UI observes this and pulses, then moves on. */
     private val _hapticTick = MutableStateFlow(0L)
@@ -117,10 +153,35 @@ class GameViewModel(
         // The computer's seat is not touchable.
         if (uiState.value.gameMode == GameMode.VS_AI && engine.state.currentPlayer == Player.TWO) return
 
+        // Nearby play: each device only touches its own seat's turn.
+        if (uiState.value.gameMode == GameMode.NEARBY_HOST) {
+            if (uiState.value.linkStatus != LinkStatus.CONNECTED) return
+            if (engine.state.currentPlayer != Player.ONE) return
+        }
+        if (uiState.value.gameMode == GameMode.NEARBY_GUEST) {
+            if (uiState.value.linkStatus != LinkStatus.CONNECTED) return
+            if (engine.state.currentPlayer != Player.TWO) return
+            // The guest decides locally (selection UX stays instant) but the
+            // host owns the engine: an actual move becomes a wire message.
+            decideTap(position)?.let { move -> link?.sendTap(tappedPositionOf(move).index) }
+            return
+        }
+
+        decideTap(position)?.let { applyMove(it) }
+    }
+
+    /**
+     * Runs the tap-then-tap interaction for the CURRENT player and
+     * returns the engine move to apply (or null for select/deselect/
+     * rejected taps). Side effects — selection, flashes, sounds — happen
+     * here; committing the move is the caller's job (local apply, host
+     * apply, or guest send).
+     */
+    private fun decideTap(position: Position): Move? {
         val state = _uiState.value
         val gameState = state.gameState
 
-        val moveToAttempt: Move? = when {
+        return when {
             gameState.phase == GamePhase.PLACEMENT -> Move.Place(position)
 
             gameState.phase == GamePhase.MOVEMENT && state.selectedSeed == null -> {
@@ -165,11 +226,12 @@ class GameViewModel(
 
             else -> null // WON or DRAW: taps on the board do nothing
         }
-
-        moveToAttempt?.let { applyMove(it) }
     }
 
     fun undo() {
+        // Nearby play is host-authoritative; an undo that only one side
+        // performs would desync the boards, so it is off entirely.
+        if (uiState.value.gameMode.isNearby) return
         cancelAi()
         var result = engine.undo()
         // In VS_AI a "turn" is human + computer: undo both plies so the
@@ -244,11 +306,266 @@ class GameViewModel(
         _uiState.update { it.copy(adjacentMovementOnly = enabled) }
     }
 
+    // ---------------------------------------------------------------------
+    // Nearby play (WiFi LAN / Bluetooth): lobby control and session wiring
+    // ---------------------------------------------------------------------
+
+    /** Lobby → Host tab: start listening for one guest on [kind]. */
+    fun startHosting(kind: LinkKind) {
+        clearLinkHandles()
+        _linkError.value = null
+        _peers.value = emptyList()
+        _uiState.update { it.copy(linkStatus = LinkStatus.HOSTING, peerName = null, mySeat = null) }
+        when (kind) {
+            LinkKind.WIFI -> linkHandle = WifiLan.startHost(localName()) { socket ->
+                viewModelScope.launch { hostAccepted(socket.asLineTransport()) }
+            }
+
+            LinkKind.BLUETOOTH -> linkHandle = com.threeseeds.app.net.BluetoothLinks.startHost({ socket ->
+                viewModelScope.launch {
+                    hostAccepted(
+                        StreamLineTransport(socket.inputStream, socket.outputStream) { socket.close() },
+                    )
+                }
+            }, { error -> linkFailed(error) })
+        }
+    }
+
+    /** Lobby → Join tab: look for hosts on [kind]; results land in [peers]. */
+    fun scanPeers(kind: LinkKind) {
+        clearLinkHandles()
+        _linkError.value = null
+        _peers.value = emptyList()
+        _uiState.update { it.copy(linkStatus = LinkStatus.SCANNING, peerName = null, mySeat = null) }
+        when (kind) {
+            LinkKind.WIFI -> linkHandle = WifiLan.scan { peer -> publishPeer(peer) }
+            LinkKind.BLUETOOTH -> linkHandle = com.threeseeds.app.net.BluetoothLinks.startScan(
+                onBonded = { device -> onBluetoothDeviceFound(device.name, device.address) },
+                onError = { error -> linkFailed(error) },
+            )
+        }
+    }
+
+    /** A Bluetooth device arrived via ACTION_FOUND (the lobby screen owns the receiver). */
+    fun onBluetoothDeviceFound(name: String?, address: String) {
+        if (_uiState.value.linkStatus != LinkStatus.SCANNING) return
+        publishPeer(
+            LinkPeer(
+                name = name?.takeIf { it.isNotBlank() } ?: "Nearby device",
+                kind = LinkKind.BLUETOOTH,
+                id = address,
+                hostAddress = null,
+                hostPort = 0,
+                bluetoothAddress = address,
+            )
+        )
+    }
+
+    /** Lobby → Join: dial a discovered host and start the handshake. */
+    fun joinPeer(peer: LinkPeer) {
+        if (_uiState.value.linkStatus == LinkStatus.CONNECTING) return
+        _linkError.value = null
+        _uiState.update { it.copy(linkStatus = LinkStatus.CONNECTING) }
+        when (peer.kind) {
+            LinkKind.WIFI -> WifiLan.connect(
+                peer,
+                onConnected = { socket -> viewModelScope.launch { guestConnected(socket.asLineTransport()) } },
+                onError = { error -> linkFailed(error) },
+            )
+
+            LinkKind.BLUETOOTH -> {
+                val device = com.threeseeds.app.net.BluetoothLinks.deviceFor(peer.bluetoothAddress ?: "")
+                if (device == null) {
+                    linkFailed(IllegalStateException("Device not found"))
+                    return
+                }
+                com.threeseeds.app.net.BluetoothLinks.connect(
+                    device,
+                    onConnected = { socket ->
+                        viewModelScope.launch {
+                            guestConnected(
+                                StreamLineTransport(socket.inputStream, socket.outputStream) { socket.close() }
+                            )
+                        }
+                    },
+                    onError = { error -> linkFailed(error) },
+                )
+            }
+        }
+    }
+
+    /**
+     * Closes the link and resets the lobby — called when leaving a
+     * nearby match (and harmless in every other mode).
+     */
+    fun leaveLink() {
+        link?.setListener(null)
+        link?.sendBye()
+        link?.close()
+        link = null
+        clearLinkHandles()
+        networkRules = null
+        _peers.value = emptyList()
+        _linkError.value = null
+        _uiState.update { it.copy(linkStatus = LinkStatus.NONE, peerName = null, mySeat = null) }
+    }
+
+    fun clearLinkError() {
+        _linkError.value = null
+    }
+
+    private fun hostAccepted(transport: StreamLineTransport) {
+        val session = LinkSession(
+            isHost = true,
+            transport = transport,
+            localName = localName(),
+            hostRules = { (networkRules ?: settings.movementRules).name },
+        )
+        wireSession(session)
+    }
+
+    private fun guestConnected(transport: StreamLineTransport) {
+        val session = LinkSession(isHost = false, transport = transport, localName = localName())
+        wireSession(session)
+    }
+
+    /**
+     * Test seam: production builds sessions inside hostAccepted /
+     * guestConnected; tests hand in a session over an in-memory pair.
+     */
+    internal fun attachSession(session: LinkSession) = wireSession(session)
+
+    private fun wireSession(session: LinkSession) {
+        session.setListener(object : LinkSession.Listener {
+            override fun onConnected(peerName: String, rules: String) {
+                val isHost = session.isHost
+                viewModelScope.launch {
+                    if (!isHost) {
+                        networkRules = runCatching { MovementRules.valueOf(rules) }.getOrNull()
+                    }
+                    _uiState.update {
+                        it.copy(
+                            linkStatus = LinkStatus.CONNECTED,
+                            peerName = peerName,
+                            mySeat = if (isHost) Player.ONE else Player.TWO,
+                        )
+                    }
+                    // A NEW connection always means a fresh board — resuming
+                    // a leftover match from a previous session would hand the
+                    // guest a desynced board from the very first move.
+                    newMatch(if (isHost) GameMode.NEARBY_HOST else GameMode.NEARBY_GUEST)
+                }
+            }
+
+            override fun onGuestTap(index: Int) {
+                viewModelScope.launch {
+                    if (uiState.value.gameMode != GameMode.NEARBY_HOST) return@launch
+                    if (uiState.value.linkStatus != LinkStatus.CONNECTED) return@launch
+                    if (engine.state.currentPlayer != Player.TWO) return@launch
+                    decideTap(Position(index))?.let { applyMove(it) }
+                }
+            }
+
+            override fun onState(encoded: String) {
+                viewModelScope.launch { applyRemoteState(encoded) }
+            }
+
+            override fun onRematch() {
+                viewModelScope.launch {
+                    if (session.isHost) restart() else newMatch(GameMode.NEARBY_GUEST)
+                }
+            }
+
+            override fun onDisconnected(reason: String?) {
+                viewModelScope.launch {
+                    link = null
+                    networkRules = null
+                    val status = _uiState.value.linkStatus
+                    when {
+                        // Mid-match drop: keep the board, mark the link lost.
+                        status == LinkStatus.CONNECTED ->
+                            _uiState.update { it.copy(linkStatus = LinkStatus.LOST) }
+
+                        // A dead pre-handshake session while hosting is not a
+                        // failure — keep waiting for the next guest.
+                        status == LinkStatus.HOSTING -> Unit
+
+                        status == LinkStatus.SCANNING || status == LinkStatus.CONNECTING ->
+                            _uiState.update { it.copy(linkStatus = LinkStatus.NONE) }
+                    }
+                    if (reason != null) _linkError.value = reason
+                }
+            }
+        })
+        link = session
+        session.start()
+    }
+
+    /** Guest: adopt an authoritative host snapshot wholesale. */
+    private fun applyRemoteState(encoded: String) {
+        val before = engine.state
+        val after = GameStateCodec.decode(encoded)
+        engine.restore(after)
+        persist()
+
+        val soundOn = _uiState.value.soundEnabled
+        when {
+            before.phase != GamePhase.WON && after.phase == GamePhase.WON -> {
+                if (soundOn) soundPlayer.playVictory()
+                pulseHaptic()
+            }
+
+            after.history.size > before.history.size -> {
+                if (soundOn) {
+                    if (after.phase == GamePhase.PLACEMENT) soundPlayer.playSeedPlaced()
+                    else soundPlayer.playSeedMoved()
+                }
+                pulseHaptic()
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                gameState = after,
+                selectedSeed = null,
+                legalDestinations = emptySet(),
+                invalidMoveFlash = null,
+                hintMessage = null,
+            ).withMovableSeeds(movableSeedsIn(after))
+        }
+        maybeRecordResult()
+    }
+
+    private fun publishPeer(peer: LinkPeer) {
+        _peers.update { list ->
+            if (list.any { it.id == peer.id }) list.map { if (it.id == peer.id) peer else it }
+            else list + peer
+        }
+    }
+
+    private fun linkFailed(error: Throwable) {
+        viewModelScope.launch {
+            clearLinkHandles()
+            _uiState.update { it.copy(linkStatus = LinkStatus.ERROR) }
+            _linkError.value = error.message ?: "Connection failed"
+        }
+    }
+
+    private fun clearLinkHandles() {
+        linkHandle?.close()
+        linkHandle = null
+    }
+
     private fun newMatch(mode: GameMode) {
         matchEpoch++
         cancelAi()
         matchRecorded = false
-        engine.movementRules = settings.movementRules
+        // Nearby matches carry their own frozen ruleset: the host keeps
+        // the one frozen at its start (or adopts the same value on every
+        // rematch); the guest uses what WELCOME delivered.
+        engine.movementRules = networkRules ?: settings.movementRules
+        if (mode == GameMode.NEARBY_HOST) networkRules = engine.movementRules
+        if (!mode.isNearby) networkRules = null
         savedStateHandle[KEY_SAVED_RULES] = engine.movementRules.name
         savedStateHandle[KEY_SAVED_MODE] = mode.name
         engine.reset()
@@ -266,6 +583,15 @@ class GameViewModel(
                 aiThinking = false,
                 lastCoinsEarned = null
             ).withMovableSeeds(movableSeedsIn(engine.state))
+        }
+
+        // A fresh board must reach the guest: this covers match start,
+        // the host's Restart, and REMATCH after the overlay. REMATCH goes
+        // first so the guest clears its per-match bookkeeping (coins
+        // awarded, recorded flag) before mirroring the new board.
+        if (mode == GameMode.NEARBY_HOST) {
+            link?.sendRematch()
+            link?.sendState(GameStateCodec.encode(engine.state))
         }
     }
 
@@ -374,6 +700,13 @@ class GameViewModel(
         }
 
         maybeRecordResult()
+
+        // Host broadcast: every accepted change goes out verbatim; a
+        // rejected tap changes nothing, so the guest's own selection
+        // survives for its retry (it never saw the rejection).
+        if (rejection == null && uiState.value.gameMode == GameMode.NEARBY_HOST) {
+            link?.sendState(GameStateCodec.encode(result.state))
+        }
         if (rejection == null) maybeStartAiTurn()
     }
 

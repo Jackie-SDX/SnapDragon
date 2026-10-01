@@ -12,7 +12,8 @@ class GameViewModelFactory(
     owner: SavedStateRegistryOwner,
     private val settings: SettingsStore,
     private val soundPlayer: SoundPlayer,
-    private val profile: ProfileStore
+    private val profile: ProfileStore,
+    private val localName: () -> String = { "Player" }
 ) : AbstractSavedStateViewModelFactory(owner, null) {
 
     override fun <T : ViewModel> create(
@@ -21,6 +22,6 @@ class GameViewModelFactory(
         handle: SavedStateHandle
     ): T {
         @Suppress("UNCHECKED_CAST")
-        return GameViewModel(handle, settings, soundPlayer, profile) as T
+        return GameViewModel(handle, settings, soundPlayer, profile, localName = localName) as T
     }
 }

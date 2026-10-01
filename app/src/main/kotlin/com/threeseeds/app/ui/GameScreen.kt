@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.threeseeds.app.R
 import com.threeseeds.app.state.GameMode
 import com.threeseeds.app.state.GameUiState
+import com.threeseeds.app.state.LinkStatus
 import com.threeseeds.app.state.UiHint
 import com.threeseeds.app.theme.AccentMagenta
 import com.threeseeds.app.theme.InvalidFlashColor
@@ -102,7 +103,9 @@ fun GameScreen(
                 isPaused = uiState.isPaused,
                 onUndoClick = onUndo,
                 onRestartClick = { showRestartConfirm = true },
-                onPauseClick = onTogglePause
+                onPauseClick = onTogglePause,
+                showUndo = !uiState.gameMode.isNearby,
+                showRestart = uiState.gameMode != GameMode.NEARBY_GUEST
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -114,7 +117,12 @@ fun GameScreen(
                 seedsOnBoard = gameState.board.positionsOf(gameState.currentPlayer).size,
                 adjacentMovementOnly = uiState.matchAdjacentMovementOnly,
                 computerSeat = uiState.gameMode == GameMode.VS_AI &&
-                    gameState.currentPlayer == Player.TWO
+                    gameState.currentPlayer == Player.TWO,
+                waitingRemote = uiState.gameMode.isNearby &&
+                    uiState.mySeat != null &&
+                    gameState.currentPlayer != uiState.mySeat &&
+                    gameState.phase != GamePhase.WON && gameState.phase != GamePhase.DRAW,
+                linkLost = uiState.linkStatus == LinkStatus.LOST
             )
 
             AnimatedVisibility(
@@ -177,6 +185,9 @@ fun GameScreen(
                 winnerNumber = gameState.winner?.let { if (it == Player.ONE) 1 else 2 },
                 coinsEarned = uiState.lastCoinsEarned,
                 vsAi = uiState.gameMode == GameMode.VS_AI,
+                networked = uiState.gameMode.isNearby,
+                iWon = uiState.mySeat != null && gameState.winner == uiState.mySeat,
+                canRematch = uiState.gameMode != GameMode.NEARBY_GUEST,
                 onPlayAgain = onPlayAgain,
                 onExitToMenu = onExitToMenu
             )
@@ -208,14 +219,27 @@ private fun hintTextResource(hint: UiHint): Int = when (hint) {
 }
 
 @Composable
-private fun TopBar(isPaused: Boolean, onUndoClick: () -> Unit, onRestartClick: () -> Unit, onPauseClick: () -> Unit) {
+private fun TopBar(
+    isPaused: Boolean,
+    onUndoClick: () -> Unit,
+    onRestartClick: () -> Unit,
+    onPauseClick: () -> Unit,
+    showUndo: Boolean,
+    showRestart: Boolean
+) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        TextButton(onClick = onUndoClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
-            Text(stringResource(R.string.undo))
+        Row {
+            if (showUndo) {
+                TextButton(onClick = onUndoClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
+                    Text(stringResource(R.string.undo))
+                }
+            }
         }
         Row {
-            TextButton(onClick = onRestartClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
-                Text(stringResource(R.string.restart))
+            if (showRestart) {
+                TextButton(onClick = onRestartClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
+                    Text(stringResource(R.string.restart))
+                }
             }
             TextButton(onClick = onPauseClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
                 Text(stringResource(if (isPaused) R.string.resume else R.string.pause))
@@ -231,11 +255,15 @@ private fun TurnBanner(
     remainingForCurrentPlayer: Int,
     seedsOnBoard: Int,
     adjacentMovementOnly: Boolean,
-    computerSeat: Boolean
+    computerSeat: Boolean,
+    waitingRemote: Boolean = false,
+    linkLost: Boolean = false
 ) {
     val theme = LocalGameTheme.current
     val playerColor = if (currentPlayerNumber == 1) theme.playerOne else theme.playerTwo
     val title = when {
+        linkLost -> stringResource(R.string.link_lost)
+        waitingRemote -> stringResource(R.string.turn_waiting)
         !computerSeat -> stringResource(
             if (isPlacementPhase) R.string.turn_placement else R.string.turn_movement,
             currentPlayerNumber
@@ -267,10 +295,11 @@ private fun TurnBanner(
                 fontWeight = FontWeight.Bold
             )
         }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
+        if (!waitingRemote && !linkLost) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
             if (isPlacementPhase) {
                 Text(
                     text = stringResource(R.string.seeds_remaining, remainingForCurrentPlayer),
@@ -292,6 +321,7 @@ private fun TurnBanner(
                     style = MaterialTheme.typography.bodyLarge,
                     color = LegalDestinationColor
                 )
+            }
             }
         }
     }
@@ -322,6 +352,9 @@ private fun EndOfGameOverlay(
     winnerNumber: Int?,
     coinsEarned: Int?,
     vsAi: Boolean,
+    networked: Boolean = false,
+    iWon: Boolean = false,
+    canRematch: Boolean = true,
     onPlayAgain: () -> Unit,
     onExitToMenu: () -> Unit
 ) {
@@ -350,6 +383,8 @@ private fun EndOfGameOverlay(
                     ) {
                         Text(
                             text = when {
+                                networked && iWon -> stringResource(R.string.you_win)
+                                networked -> stringResource(R.string.opponent_wins)
                                 vsAi && winnerNumber == 2 -> stringResource(R.string.computer_wins)
                                 vsAi && winnerNumber == 1 -> stringResource(R.string.you_win)
                                 else -> stringResource(R.string.player_wins, winnerNumber ?: 1)
@@ -372,10 +407,12 @@ private fun EndOfGameOverlay(
                     )
                 }
                 Spacer(modifier = Modifier.height(20.dp))
-                Button(onClick = onPlayAgain, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                    Text(stringResource(R.string.play_again))
+                if (canRematch) {
+                    Button(onClick = onPlayAgain, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Text(stringResource(R.string.play_again))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-                Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(onClick = onExitToMenu, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                     Text(stringResource(R.string.main_menu))
                 }

@@ -1,12 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Nearby play: raw sockets on the LAN (targetSdk 36 = implicitly
+         granted via INTERNET per Android 16 local-network rules; never
+         declare ACCESS_LOCAL_NETWORK at this target SDK) + classic
+         Bluetooth RFCOMM, split by API level the way the platform
+         expects (legacy permissions capped at API 30). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
     <!--
-      No <uses-permission> entries on purpose: this app has nothing to
-      ask for. No network access is used (offline-first), and haptic
-      feedback goes through Compose's LocalHapticFeedback, which uses
-      the same permission-free path as View.performHapticFeedback()
-      rather than the raw Vibrator API (which would need VIBRATE).
+      Haptic feedback goes through Compose's LocalHapticFeedback, which uses
+      the same permission-free path as View.performHapticFeedback() rather
+      than the raw Vibrator API (which would need VIBRATE).
     -->
 
     <application

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,6 +48,7 @@ fun MainMenuScreen(
     profile: ProfileData,
     onPlayLocal: () -> Unit,
     onPlayVsAi: () -> Unit,
+    onPlayNearby: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -54,7 +57,7 @@ fun MainMenuScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(PaddingValues(24.dp)),
+            modifier = Modifier.fillMaxSize().padding(PaddingValues(24.dp)).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -107,6 +110,13 @@ fun MainMenuScreen(
                     onClick = onPlayVsAi,
                     modifier = Modifier.width(240.dp).height(MIN_BUTTON_HEIGHT)
                 ) { Text(stringResource(R.string.menu_play_ai)) }
+            }
+
+            Column(modifier = Modifier.padding(top = 16.dp)) {
+                OutlinedButton(
+                    onClick = onPlayNearby,
+                    modifier = Modifier.width(240.dp).height(MIN_BUTTON_HEIGHT)
+                ) { Text(stringResource(R.string.menu_play_nearby)) }
             }
 
             Column(modifier = Modifier.padding(top = 16.dp)) {

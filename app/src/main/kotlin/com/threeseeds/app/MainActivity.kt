@@ -16,18 +16,20 @@ import com.threeseeds.app.audio.SoundEffects
 import com.threeseeds.app.profile.ProfileRepository
 import com.threeseeds.app.settings.SettingsRepository
 import com.threeseeds.app.state.GameMode
+import com.threeseeds.app.state.LinkStatus
 import com.threeseeds.app.theme.LocalGameTheme
 import com.threeseeds.app.theme.ThemedBackground
 import com.threeseeds.app.theme.ThreeSeedsTheme
 import com.threeseeds.app.theme.ThemeCatalog
 import com.threeseeds.app.ui.GameScreen
 import com.threeseeds.app.ui.MainMenuScreen
+import com.threeseeds.app.ui.NearbyScreen
 import com.threeseeds.app.ui.SettingsScreen
 import com.threeseeds.app.viewmodel.GameViewModel
 import com.threeseeds.app.viewmodel.GameViewModelFactory
 import kotlinx.coroutines.delay
 
-private enum class Screen { MENU, GAME, SETTINGS }
+private enum class Screen { MENU, GAME, SETTINGS, NEARBY }
 
 class MainActivity : ComponentActivity() {
 
@@ -36,7 +38,13 @@ class MainActivity : ComponentActivity() {
     private val profile by lazy { ProfileRepository(this) }
 
     private val gameViewModel: GameViewModel by viewModels {
-        GameViewModelFactory(owner = this, settings = settings, soundPlayer = soundEffects, profile = profile)
+        GameViewModelFactory(
+            owner = this,
+            settings = settings,
+            soundPlayer = soundEffects,
+            profile = profile,
+            localName = { android.os.Build.MODEL ?: "Player" }
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +54,8 @@ class MainActivity : ComponentActivity() {
             var currentScreen by rememberSaveable { mutableStateOf(Screen.MENU) }
             val uiState by gameViewModel.uiState.collectAsState()
             val hapticTick by gameViewModel.hapticTick.collectAsState()
+            val peers by gameViewModel.peers.collectAsState()
+            val linkError by gameViewModel.linkError.collectAsState()
 
             // The equipped theme (profileData.themeId) is persistent and
             // changes ONLY on an explicit user tap. Rotation advances a
@@ -71,11 +81,19 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // Handshake finished in the lobby → straight into the match.
+            LaunchedEffect(uiState.linkStatus, currentScreen) {
+                if (uiState.linkStatus == LinkStatus.CONNECTED && currentScreen == Screen.NEARBY) {
+                    currentScreen = Screen.GAME
+                }
+            }
+
             val theme = ThemeCatalog.byId(displayedThemeId)
 
             // Back steps down one screen; on the menu the system default
             // (close the app) takes over.
             BackHandler(enabled = currentScreen != Screen.MENU) {
+                if (currentScreen == Screen.GAME) gameViewModel.leaveLink()
                 currentScreen = Screen.MENU
             }
 
@@ -93,6 +111,7 @@ class MainActivity : ComponentActivity() {
                                     gameViewModel.startMatch(GameMode.VS_AI)
                                     currentScreen = Screen.GAME
                                 },
+                                onPlayNearby = { currentScreen = Screen.NEARBY },
                                 onSettings = { currentScreen = Screen.SETTINGS }
                             )
 
@@ -104,7 +123,10 @@ class MainActivity : ComponentActivity() {
                                 onRestart = gameViewModel::restart,
                                 onPlayAgain = gameViewModel::playAgain,
                                 onTogglePause = gameViewModel::togglePause,
-                                onExitToMenu = { currentScreen = Screen.MENU },
+                                onExitToMenu = {
+                                    gameViewModel.leaveLink()
+                                    currentScreen = Screen.MENU
+                                },
                                 onClearInvalidFlash = gameViewModel::clearInvalidFlash,
                                 onClearHint = gameViewModel::clearHint
                             )
@@ -121,6 +143,21 @@ class MainActivity : ComponentActivity() {
                                 onAdjacentMovementOnlyChanged = gameViewModel::setAdjacentMovementOnly,
                                 onProfileChanged = { transform -> profile.update(transform) },
                                 onBack = { currentScreen = Screen.MENU }
+                            )
+
+                            Screen.NEARBY -> NearbyScreen(
+                                uiState = uiState,
+                                peers = peers,
+                                linkError = linkError,
+                                onHost = gameViewModel::startHosting,
+                                onScan = gameViewModel::scanPeers,
+                                onJoin = gameViewModel::joinPeer,
+                                onCancel = gameViewModel::leaveLink,
+                                onClearError = gameViewModel::clearLinkError,
+                                onBack = {
+                                    gameViewModel.leaveLink()
+                                    currentScreen = Screen.MENU
+                                }
                             )
                         }
                     }

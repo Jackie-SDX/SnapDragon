@@ -43,6 +43,12 @@ object Economy {
                 Player.TWO -> 4
                 null -> 5
             }
+
+            GameMode.NEARBY_HOST, GameMode.NEARBY_GUEST -> when {
+                winner == null -> 5
+                winner == seatOf(mode) -> 8
+                else -> 4
+            }
         }
         if (mode == GameMode.VS_AI && winner == Player.ONE) {
             val newStreak = profile.streak + 1
@@ -64,15 +70,22 @@ object Economy {
     ): ProfileData {
         val gained = reward(profile, mode, winner, difficulty)
         val newStreak = if (mode == GameMode.VS_AI && winner == Player.ONE) profile.streak + 1 else 0
+        // In nearby play this device owns a seat, so "win" means MY seat
+        // won; every other mode keeps the device in Player One's seat.
+        val iWon = if (mode.isNearby) winner == seatOf(mode) else winner == Player.ONE
         return profile.copy(
             coins = profile.coins + gained,
-            wins = profile.wins + if (winner == Player.ONE) 1 else 0,
-            losses = profile.losses + if (winner == Player.TWO) 1 else 0,
+            wins = profile.wins + if (iWon) 1 else 0,
+            losses = profile.losses + if (winner != null && !iWon) 1 else 0,
             draws = profile.draws + if (winner == null) 1 else 0,
             streak = newStreak,
             bestStreak = maxOf(profile.bestStreak, newStreak),
         )
     }
+
+    /** The seat this device plays in a nearby match. */
+    private fun seatOf(mode: GameMode): Player =
+        if (mode == GameMode.NEARBY_HOST) Player.ONE else Player.TWO
 
     /** True when [themeCost] can be paid from [profile] without going negative. */
     fun canAfford(profile: ProfileData, themeCost: Int): Boolean =

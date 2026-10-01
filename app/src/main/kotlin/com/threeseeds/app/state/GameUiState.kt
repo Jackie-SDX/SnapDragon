@@ -1,6 +1,7 @@
 package com.threeseeds.app.state
 
 import com.threeseeds.engine.GameState
+import com.threeseeds.engine.Player
 import com.threeseeds.engine.Position
 
 /** Why a tap did nothing — shown by the game screen as a short coach message. */
@@ -50,5 +51,11 @@ data class GameUiState(
     val invalidMoveFlash: Position? = null,
     val soundEnabled: Boolean = true,
     val hapticsEnabled: Boolean = true,
-    val debugModeEnabled: Boolean = false
+    val debugModeEnabled: Boolean = false,
+    /** Nearby play: link lifecycle (see [LinkStatus]). */
+    val linkStatus: LinkStatus = LinkStatus.NONE,
+    /** Nearby play: the other player's display name, once known. */
+    val peerName: String? = null,
+    /** Nearby play: this device's seat; null when not in a nearby match. */
+    val mySeat: Player? = null
 )

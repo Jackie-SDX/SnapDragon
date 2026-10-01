@@ -23,6 +23,16 @@ class GameEngine(
     var state: GameState = initialState
         private set
 
+    /**
+     * Replaces the current state wholesale — the snapshot-restore path
+     * (process-death recovery, and mirroring a remote host's
+     * authoritative board in nearby play). No events: the caller
+     * renders from whatever state it handed in.
+     */
+    fun restore(state: GameState) {
+        this.state = state
+    }
+
     /** The only way any move reaches the board. Always returns a result, even when rejected. */
     fun apply(move: Move): MoveResult {
         val result = when (move) {
