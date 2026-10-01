@@ -6,6 +6,9 @@ import com.threeseeds.engine.MovementRules
 
 interface SettingsStore {
     var soundEnabled: Boolean
+
+    /** Looped CC0 soundtrack bundled with the app; on by default. */
+    var musicEnabled: Boolean
     var hapticsEnabled: Boolean
     var debugModeEnabled: Boolean
 
@@ -34,6 +37,10 @@ class SettingsRepository(context: Context) : SettingsStore {
         get() = prefs.getBoolean(KEY_SOUND, true)
         set(value) = prefs.edit().putBoolean(KEY_SOUND, value).apply()
 
+    override var musicEnabled: Boolean
+        get() = prefs.getBoolean(KEY_MUSIC, true)
+        set(value) = prefs.edit().putBoolean(KEY_MUSIC, value).apply()
+
     override var hapticsEnabled: Boolean
         get() = prefs.getBoolean(KEY_HAPTICS, true)
         set(value) = prefs.edit().putBoolean(KEY_HAPTICS, value).apply()
@@ -49,6 +56,7 @@ class SettingsRepository(context: Context) : SettingsStore {
     private companion object {
         const val PREFS_NAME = "three_seeds_settings"
         const val KEY_SOUND = "sound_enabled"
+        const val KEY_MUSIC = "music_enabled"
         const val KEY_HAPTICS = "haptics_enabled"
         const val KEY_DEBUG = "debug_mode_enabled"
         const val KEY_ADJACENT = "adjacent_movement_only"

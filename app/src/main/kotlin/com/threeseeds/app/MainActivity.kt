@@ -12,6 +12,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.threeseeds.app.audio.MusicPlayer
 import com.threeseeds.app.audio.SoundEffects
 import com.threeseeds.app.profile.ProfileRepository
 import com.threeseeds.app.settings.SettingsRepository
@@ -36,6 +39,7 @@ class MainActivity : ComponentActivity() {
     private val settings by lazy { SettingsRepository(this) }
     private val soundEffects by lazy { SoundEffects() }
     private val profile by lazy { ProfileRepository(this) }
+    private val musicPlayer by lazy { MusicPlayer(this, settings.musicEnabled) }
 
     private val gameViewModel: GameViewModel by viewModels {
         GameViewModelFactory(
@@ -49,6 +53,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Soundtrack follows the activity: play while visible (if the
+        // Settings toggle allows it), pause when the app goes away.
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> musicPlayer.play()
+                Lifecycle.Event.ON_STOP -> musicPlayer.pause()
+                else -> Unit
+            }
+        })
+
         setContent {
             val profileData by profile.data.collectAsState()
             var currentScreen by rememberSaveable { mutableStateOf(Screen.MENU) }
@@ -79,6 +94,11 @@ class MainActivity : ComponentActivity() {
                     displayedThemeId = ThemeCatalog
                         .nextUnlocked(displayedThemeId, profileData.unlockedThemes).id
                 }
+            }
+
+            // Settings toggle → live soundtrack state.
+            LaunchedEffect(uiState.musicEnabled) {
+                musicPlayer.setEnabled(uiState.musicEnabled)
             }
 
             // Handshake finished in the lobby → straight into the match.
@@ -134,10 +154,12 @@ class MainActivity : ComponentActivity() {
                             Screen.SETTINGS -> SettingsScreen(
                                 profile = profileData,
                                 soundEnabled = uiState.soundEnabled,
+                                musicEnabled = uiState.musicEnabled,
                                 hapticsEnabled = uiState.hapticsEnabled,
                                 debugModeEnabled = uiState.debugModeEnabled,
                                 adjacentMovementOnly = uiState.adjacentMovementOnly,
                                 onSoundChanged = gameViewModel::setSoundEnabled,
+                                onMusicChanged = gameViewModel::setMusicEnabled,
                                 onHapticsChanged = gameViewModel::setHapticsEnabled,
                                 onDebugModeChanged = gameViewModel::setDebugModeEnabled,
                                 onAdjacentMovementOnlyChanged = gameViewModel::setAdjacentMovementOnly,
@@ -164,5 +186,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        musicPlayer.release()
+        soundEffects.release()
+        super.onDestroy()
     }
 }

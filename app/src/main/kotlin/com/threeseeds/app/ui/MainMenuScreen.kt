@@ -144,7 +144,8 @@ fun MainMenuScreen(
                     stringResource(R.string.about_body) + "\n\n" +
                         stringResource(R.string.about_version, BuildConfig.VERSION_NAME) + "\n" +
                         stringResource(R.string.about_author) + "\n" +
-                        stringResource(R.string.about_source)
+                        stringResource(R.string.about_source) + "\n" +
+                        stringResource(R.string.about_music)
                 )
             },
             confirmButton = {

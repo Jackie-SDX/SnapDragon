@@ -16,6 +16,7 @@ import kotlin.test.assertTrue
 
 private class FakeSettingsStore(
     override var soundEnabled: Boolean = true,
+    override var musicEnabled: Boolean = true,
     override var hapticsEnabled: Boolean = true,
     override var debugModeEnabled: Boolean = false,
     override var adjacentMovementOnly: Boolean = false
@@ -223,13 +224,16 @@ class GameViewModelTest {
         val viewModel = newViewModel(settings = settings)
 
         viewModel.setSoundEnabled(false)
+        viewModel.setMusicEnabled(false)
         viewModel.setHapticsEnabled(false)
         viewModel.setDebugModeEnabled(true)
 
         assertEquals(false, settings.soundEnabled)
+        assertEquals(false, settings.musicEnabled)
         assertEquals(false, settings.hapticsEnabled)
         assertEquals(true, settings.debugModeEnabled)
         assertEquals(false, viewModel.uiState.value.soundEnabled)
+        assertEquals(false, viewModel.uiState.value.musicEnabled)
         assertEquals(false, viewModel.uiState.value.hapticsEnabled)
         assertEquals(true, viewModel.uiState.value.debugModeEnabled)
     }

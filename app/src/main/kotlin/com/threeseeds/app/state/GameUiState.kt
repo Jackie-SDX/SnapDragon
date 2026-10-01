@@ -50,6 +50,7 @@ data class GameUiState(
     val isPaused: Boolean = false,
     val invalidMoveFlash: Position? = null,
     val soundEnabled: Boolean = true,
+    val musicEnabled: Boolean = true,
     val hapticsEnabled: Boolean = true,
     val debugModeEnabled: Boolean = false,
     /** Nearby play: link lifecycle (see [LinkStatus]). */

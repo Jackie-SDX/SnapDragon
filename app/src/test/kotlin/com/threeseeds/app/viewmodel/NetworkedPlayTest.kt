@@ -28,6 +28,7 @@ class NetworkedPlayTest {
 
     private class FakeSettings(
         override var soundEnabled: Boolean = true,
+        override var musicEnabled: Boolean = true,
         override var hapticsEnabled: Boolean = true,
         override var debugModeEnabled: Boolean = false,
         override var adjacentMovementOnly: Boolean = false

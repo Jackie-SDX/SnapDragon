@@ -40,10 +40,12 @@ import com.threeseeds.engine.ai.AiPersonality
 fun SettingsScreen(
     profile: ProfileData,
     soundEnabled: Boolean,
+    musicEnabled: Boolean,
     hapticsEnabled: Boolean,
     debugModeEnabled: Boolean,
     adjacentMovementOnly: Boolean,
     onSoundChanged: (Boolean) -> Unit,
+    onMusicChanged: (Boolean) -> Unit,
     onHapticsChanged: (Boolean) -> Unit,
     onDebugModeChanged: (Boolean) -> Unit,
     onAdjacentMovementOnlyChanged: (Boolean) -> Unit,
@@ -58,6 +60,12 @@ fun SettingsScreen(
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
         SettingRow(label = stringResource(R.string.settings_sound), checked = soundEnabled, onCheckedChange = onSoundChanged)
+        SettingRow(
+            label = stringResource(R.string.settings_music),
+            description = stringResource(R.string.settings_music_description),
+            checked = musicEnabled,
+            onCheckedChange = onMusicChanged
+        )
         SettingRow(label = stringResource(R.string.settings_haptics), checked = hapticsEnabled, onCheckedChange = onHapticsChanged)
         SettingRow(
             label = stringResource(R.string.settings_adjacent),

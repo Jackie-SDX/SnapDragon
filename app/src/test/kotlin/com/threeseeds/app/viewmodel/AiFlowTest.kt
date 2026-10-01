@@ -44,6 +44,7 @@ class AiFlowTest {
         override var adjacentMovementOnly: Boolean = false
     ) : SettingsStore {
         override var soundEnabled = true
+        override var musicEnabled = true
         override var hapticsEnabled = true
         override var debugModeEnabled = false
     }

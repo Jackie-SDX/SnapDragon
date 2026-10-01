@@ -99,6 +99,7 @@ class GameViewModel(
             matchAdjacentMovementOnly = matchRules == MovementRules.TAPATAN,
             gameMode = initialMode,
             soundEnabled = settings.soundEnabled,
+            musicEnabled = settings.musicEnabled,
             hapticsEnabled = settings.hapticsEnabled,
             debugModeEnabled = settings.debugModeEnabled,
             // A nearby match cannot survive process death: sockets are gone,
@@ -284,6 +285,11 @@ class GameViewModel(
     fun setSoundEnabled(enabled: Boolean) {
         settings.soundEnabled = enabled
         _uiState.update { it.copy(soundEnabled = enabled) }
+    }
+
+    fun setMusicEnabled(enabled: Boolean) {
+        settings.musicEnabled = enabled
+        _uiState.update { it.copy(musicEnabled = enabled) }
     }
 
     fun setHapticsEnabled(enabled: Boolean) {
