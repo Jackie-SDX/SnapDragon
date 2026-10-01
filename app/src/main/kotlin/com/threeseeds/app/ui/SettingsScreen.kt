@@ -17,7 +17,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -178,7 +177,11 @@ fun SettingsScreen(
         StatRow(stringResource(R.string.stats_best_streak), profile.bestStreak)
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-        TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
+        ThreeDButton(
+            onClick = onBack,
+            variant = Button3DVariant.TEXT,
+            modifier = Modifier.heightIn(min = 48.dp)
+        ) {
             Text(stringResource(R.string.close))
         }
     }

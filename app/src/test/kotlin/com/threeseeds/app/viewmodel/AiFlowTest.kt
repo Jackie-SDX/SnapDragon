@@ -50,10 +50,12 @@ class AiFlowTest {
     }
 
     private class FakeSound : SoundPlayer {
-        override fun playSeedPlaced() {}
-        override fun playSeedMoved() {}
-        override fun playInvalidMove() {}
-        override fun playVictory() {}
+        val played = mutableListOf<String>()
+        override fun playSeedPlaced() { played += "placed" }
+        override fun playSeedMoved() { played += "moved" }
+        override fun playInvalidMove() { played += "invalid" }
+        override fun playVictory() { played += "victory" }
+        override fun playAiVictory() { played += "ai_victory" }
         override fun release() {}
     }
 
@@ -61,10 +63,11 @@ class AiFlowTest {
         handle: SavedStateHandle = SavedStateHandle(),
         profile: InMemoryProfileStore = InMemoryProfileStore(ProfileData(difficulty = AiDifficulty.BEGINNER)),
         aiDelayMsOverride: Long? = 0L,
+        sound: SoundPlayer = FakeSound(),
     ) = GameViewModel(
         savedStateHandle = handle,
         settings = FakeSettings(),
-        soundPlayer = FakeSound(),
+        soundPlayer = sound,
         profile = profile,
         aiDispatcher = UnconfinedTestDispatcher(testScheduler),
         aiDelayMsOverride = aiDelayMsOverride,
@@ -220,6 +223,49 @@ class AiFlowTest {
             assertEquals(Player.ONE, state.currentPlayer)
             assertEquals(1, state.board.positionsOf(Player.TWO).size)
             assertFalse(vm.uiState.value.aiThinking)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `a machine win plays the dark sting instead of the bright victory tone`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            // The machine has two in a row with its last seed to place;
+            // its immediate-win ordering completes 0-1-2 on restore.
+            val board = Board()
+                .placed(Position(0), Player.TWO)
+                .placed(Position(1), Player.TWO)
+                .placed(Position(3), Player.ONE)
+                .placed(Position(4), Player.ONE)
+            val state = GameState(
+                board = board,
+                currentPlayer = Player.TWO,
+                phase = GamePhase.PLACEMENT,
+                seedsRemaining = Player.entries.associateWith {
+                    GameState.SEEDS_PER_PLAYER - board.positionsOf(it).size
+                },
+                history = listOf(
+                    BoardSnapshot(Board(), Player.ONE),
+                    BoardSnapshot(board, Player.TWO),
+                ),
+            )
+            val handle = SavedStateHandle(
+                mapOf(
+                    "saved_game_state" to GameStateCodec.encode(state),
+                    "saved_mode" to GameMode.VS_AI.name,
+                )
+            )
+            val sound = FakeSound()
+
+            val vm = newViewModel(handle = handle, sound = sound)
+
+            val finalState = vm.uiState.value.gameState
+            assertEquals(GamePhase.WON, finalState.phase, "the machine should take its immediate win")
+            assertEquals(Player.TWO, finalState.winner)
+            assertTrue("ai_victory" in sound.played, "machine win must play the dark sting: ${sound.played}")
+            assertTrue("victory" !in sound.played, "machine win must not play the bright tone: ${sound.played}")
         } finally {
             Dispatchers.resetMain()
         }

@@ -31,11 +31,18 @@ import kotlin.random.Random
  * and new theme's gradient, the theme's ambient motif drifting over it,
  * then [content] on top. Screens no longer paint their own background —
  * this is the single place the board's mood is set.
+ *
+ * The crossfade is keyed on the theme ID and resolves the STATIC theme
+ * inside, so callers can pass a color-animated theme without the
+ * animation restarting the crossfade on every interpolated frame. The
+ * background and the UI palette therefore transform together over the
+ * same window instead of snapping apart.
  */
 @Composable
 fun ThemedBackground(theme: GameTheme, content: @Composable BoxScope.() -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
-        Crossfade(targetState = theme, animationSpec = tween(500), label = "theme_crossfade") { current ->
+        Crossfade(targetState = theme.id, animationSpec = tween(500), label = "theme_crossfade") { id ->
+            val current = ThemeCatalog.byId(id)
             Box(
                 modifier = Modifier
                     .fillMaxSize()

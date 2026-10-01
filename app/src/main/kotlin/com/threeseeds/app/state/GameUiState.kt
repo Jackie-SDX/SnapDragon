@@ -1,5 +1,6 @@
 package com.threeseeds.app.state
 
+import com.threeseeds.engine.GamePhase
 import com.threeseeds.engine.GameState
 import com.threeseeds.engine.Player
 import com.threeseeds.engine.Position
@@ -59,4 +60,26 @@ data class GameUiState(
     val peerName: String? = null,
     /** Nearby play: this device's seat; null when not in a nearby match. */
     val mySeat: Player? = null
-)
+) {
+    /**
+     * Soundtrack intensity (0..1), derived purely from the board: the
+     * menu and early placement ride the calm track, the score builds
+     * as seeds land and movement drags on, and a decided match hits
+     * full tension. The music layer tweens toward this on every state
+     * change, so the soundtrack breathes with the match.
+     */
+    val musicIntensity: Float
+        get() = when (gameState.phase) {
+            GamePhase.WON -> 1f
+            GamePhase.DRAW -> 0.85f
+            GamePhase.PLACEMENT -> {
+                val placed = (GameState.SEEDS_PER_PLAYER * 2) - gameState.seedsRemaining.values.sum()
+                0.08f + 0.47f * (placed / 6f).coerceIn(0f, 1f)
+            }
+            GamePhase.MOVEMENT -> {
+                // history = start + 6 placements + movement half-moves.
+                val moves = (gameState.history.size - 7).coerceAtLeast(0)
+                0.55f + 0.40f * (moves / 10f).coerceAtMost(1f)
+            }
+        }
+}

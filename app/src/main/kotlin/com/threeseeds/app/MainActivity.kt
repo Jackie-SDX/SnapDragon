@@ -5,6 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -14,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.Modifier
 import com.threeseeds.app.audio.MusicPlayer
 import com.threeseeds.app.audio.SoundEffects
 import com.threeseeds.app.profile.ProfileRepository
@@ -24,6 +29,7 @@ import com.threeseeds.app.theme.LocalGameTheme
 import com.threeseeds.app.theme.ThemedBackground
 import com.threeseeds.app.theme.ThreeSeedsTheme
 import com.threeseeds.app.theme.ThemeCatalog
+import com.threeseeds.app.theme.rememberAnimatedTheme
 import com.threeseeds.app.ui.GameScreen
 import com.threeseeds.app.ui.MainMenuScreen
 import com.threeseeds.app.ui.NearbyScreen
@@ -38,7 +44,7 @@ private enum class Screen { WELCOME, MENU, GAME, SETTINGS, NEARBY }
 class MainActivity : ComponentActivity() {
 
     private val settings by lazy { SettingsRepository(this) }
-    private val soundEffects by lazy { SoundEffects() }
+    private val soundEffects by lazy { SoundEffects(this) }
     private val profile by lazy { ProfileRepository(this) }
     private val musicPlayer by lazy { MusicPlayer(this, settings.musicEnabled) }
 
@@ -82,24 +88,32 @@ class MainActivity : ComponentActivity() {
 
             // The equipped theme (profileData.themeId) is persistent and
             // changes ONLY on an explicit user tap. Rotation advances a
-            // transient DISPLAYED theme and never writes back into the
-            // profile, so the player's pick survives every screen.
-            var displayedThemeId by rememberSaveable { mutableStateOf(profileData.themeId) }
+            // transient cursor and never writes back into the profile,
+            // so the player's pick survives every screen.
+            //
+            // The DISPLAYED theme is derived every frame instead of
+            // being re-anchored by a LaunchedEffect: effect-driven
+            // writes land one composition late, which let a frame of a
+            // stale rotated theme render on entry/restore (the
+            // "flickers to another theme and comes back" bug).
+            var rotatedThemeId by rememberSaveable { mutableStateOf(profileData.themeId) }
             val rotationActive = profileData.dynamicThemes &&
                 currentScreen == Screen.GAME &&
                 profileData.unlockedThemes.size > 1
 
-            // Re-anchor to the equipped theme whenever it changes or the
-            // rotation isn't running (menu, settings, rotation off).
-            LaunchedEffect(profileData.themeId, profileData.dynamicThemes, currentScreen) {
-                if (!rotationActive) displayedThemeId = profileData.themeId
+            // While rotation is idle, keep the cursor pinned to the
+            // equipped theme so every new game starts from the pick.
+            LaunchedEffect(profileData.themeId, rotationActive) {
+                if (!rotationActive) rotatedThemeId = profileData.themeId
             }
 
-            // Advance the displayed theme every few seconds while rotating.
+            val displayedThemeId = if (rotationActive) rotatedThemeId else profileData.themeId
+
+            // Advance the cursor every few seconds while rotating.
             LaunchedEffect(displayedThemeId, rotationActive) {
                 if (rotationActive) {
                     delay(6000)
-                    displayedThemeId = ThemeCatalog
+                    rotatedThemeId = ThemeCatalog
                         .nextUnlocked(displayedThemeId, profileData.unlockedThemes).id
                 }
             }
@@ -109,6 +123,12 @@ class MainActivity : ComponentActivity() {
                 musicPlayer.setEnabled(uiState.musicEnabled)
             }
 
+            // The score swells with the match: calm on menus/placement,
+            // tense as the game decides. MusicPlayer tweens internally.
+            LaunchedEffect(uiState.musicIntensity) {
+                musicPlayer.setIntensity(uiState.musicIntensity)
+            }
+
             // Handshake finished in the lobby → straight into the match.
             LaunchedEffect(uiState.linkStatus, currentScreen) {
                 if (uiState.linkStatus == LinkStatus.CONNECTED && currentScreen == Screen.NEARBY) {
@@ -116,7 +136,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            val theme = ThemeCatalog.byId(displayedThemeId)
+            val rawTheme = ThemeCatalog.byId(displayedThemeId)
+            // UI palette animates over 500ms to match the background
+            // crossfade, so a theme change morphs instead of snapping.
+            val theme = rememberAnimatedTheme(rawTheme)
 
             // Back steps down one screen; on the menu the system default
             // (close the app) takes over.
@@ -127,7 +150,11 @@ class MainActivity : ComponentActivity() {
 
             ThreeSeedsTheme(theme = theme) {
                 CompositionLocalProvider(LocalGameTheme provides theme) {
-                    ThemedBackground(theme = theme) {
+                    ThemedBackground(theme = rawTheme) {
+                        // Android 15+ draws edge-to-edge; keep every screen
+                        // clear of the status/nav bars (the game's top bar
+                        // otherwise sits under the status bar, unreachable).
+                        Box(modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars)) {
                         when (currentScreen) {
                             Screen.WELCOME -> WelcomeScreen(
                                 onDone = { chosen ->
@@ -196,6 +223,7 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = Screen.MENU
                                 }
                             )
+                        }
                         }
                     }
                 }

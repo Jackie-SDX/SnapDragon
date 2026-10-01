@@ -21,12 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -230,18 +228,30 @@ private fun TopBar(
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Row {
             if (showUndo) {
-                TextButton(onClick = onUndoClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
+                ThreeDButton(
+                    onClick = onUndoClick,
+                    variant = Button3DVariant.TEXT,
+                    modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)
+                ) {
                     Text(stringResource(R.string.undo))
                 }
             }
         }
         Row {
             if (showRestart) {
-                TextButton(onClick = onRestartClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
+                ThreeDButton(
+                    onClick = onRestartClick,
+                    variant = Button3DVariant.TEXT,
+                    modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)
+                ) {
                     Text(stringResource(R.string.restart))
                 }
             }
-            TextButton(onClick = onPauseClick, modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)) {
+            ThreeDButton(
+                onClick = onPauseClick,
+                variant = Button3DVariant.TEXT,
+                modifier = Modifier.heightIn(min = MIN_TAP_HEIGHT)
+            ) {
                 Text(stringResource(if (isPaused) R.string.resume else R.string.pause))
             }
         }
@@ -334,11 +344,19 @@ private fun PauseOverlay(onResume: () -> Unit, onExitToMenu: () -> Unit) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(stringResource(R.string.paused_title), style = MaterialTheme.typography.headlineMedium)
                 Spacer(modifier = Modifier.height(20.dp))
-                Button(onClick = onResume, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                ThreeDButton(
+                    onClick = onResume,
+                    variant = Button3DVariant.PRIMARY,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
                     Text(stringResource(R.string.resume))
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = onExitToMenu, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                ThreeDButton(
+                    onClick = onExitToMenu,
+                    variant = Button3DVariant.OUTLINE,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
                     Text(stringResource(R.string.main_menu))
                 }
             }
@@ -408,12 +426,20 @@ private fun EndOfGameOverlay(
                 }
                 Spacer(modifier = Modifier.height(20.dp))
                 if (canRematch) {
-                    Button(onClick = onPlayAgain, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                    ThreeDButton(
+                        onClick = onPlayAgain,
+                        variant = Button3DVariant.PRIMARY,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
                         Text(stringResource(R.string.play_again))
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                 }
-                OutlinedButton(onClick = onExitToMenu, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                ThreeDButton(
+                    onClick = onExitToMenu,
+                    variant = Button3DVariant.OUTLINE,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
                     Text(stringResource(R.string.main_menu))
                 }
             }

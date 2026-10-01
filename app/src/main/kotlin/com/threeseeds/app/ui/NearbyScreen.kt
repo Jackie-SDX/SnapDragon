@@ -18,14 +18,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -97,7 +94,10 @@ fun NearbyScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { if (lobbyBusy) onCancel() else onBack() }) {
+            ThreeDButton(
+                onClick = { if (lobbyBusy) onCancel() else onBack() },
+                variant = Button3DVariant.TEXT
+            ) {
                 Text(stringResource(R.string.close))
             }
             Text(
@@ -192,11 +192,12 @@ fun NearbyScreen(
 
             else -> {
                 if (tab == LobbyTab.HOST) {
-                    Button(
+                    ThreeDButton(
                         onClick = {
                             if (kind == LinkKind.BLUETOOTH) withBluetoothPermission { onHost(kind) }
                             else onHost(kind)
                         },
+                        variant = Button3DVariant.PRIMARY,
                         enabled = kind == LinkKind.WIFI || BluetoothLinks.isSupported(),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) { Text(stringResource(R.string.nearby_host_button)) }
@@ -208,11 +209,12 @@ fun NearbyScreen(
                         )
                     }
                 } else {
-                    Button(
+                    ThreeDButton(
                         onClick = {
                             if (kind == LinkKind.BLUETOOTH) withBluetoothPermission { onScan(kind) }
                             else onScan(kind)
                         },
+                        variant = Button3DVariant.PRIMARY,
                         enabled = kind == LinkKind.WIFI || BluetoothLinks.isSupported(),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) { Text(stringResource(R.string.nearby_scan_button)) }
@@ -231,16 +233,16 @@ fun NearbyScreen(
 
 @Composable
 private fun TransportChip(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    OutlinedButton(
+    ThreeDButton(
         onClick = onClick,
+        variant = Button3DVariant.OUTLINE,
         enabled = enabled,
-        shape = RoundedCornerShape(50),
-        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-            else androidx.compose.ui.graphics.Color.Transparent,
-            contentColor = if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onBackground
-        )
+        minHeight = 40.dp,
+        containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        else androidx.compose.ui.graphics.Color.Transparent,
+        borderColor = if (selected) MaterialTheme.colorScheme.primary else null,
+        contentColor = if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onBackground
     ) { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
 }
 
@@ -253,7 +255,11 @@ private fun LobbyWaiting(text: String, onCancel: () -> Unit) {
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(top = 16.dp)
         )
-        TextButton(onClick = onCancel, modifier = Modifier.padding(top = 8.dp)) {
+        ThreeDButton(
+            onClick = onCancel,
+            variant = Button3DVariant.TEXT,
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
             Text(stringResource(R.string.nearby_cancel))
         }
     }
@@ -282,7 +288,11 @@ private fun PeerRow(peer: LinkPeer, busy: Boolean, onJoin: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Button(onClick = onJoin, enabled = !busy) { Text(stringResource(R.string.nearby_join)) }
+            ThreeDButton(
+                onClick = onJoin,
+                variant = Button3DVariant.PRIMARY,
+                enabled = !busy
+            ) { Text(stringResource(R.string.nearby_join)) }
         }
     }
 }

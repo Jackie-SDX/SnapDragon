@@ -740,7 +740,17 @@ class GameViewModel(
             when (event) {
                 is GameEvent.SeedPlaced -> { if (soundOn) soundPlayer.playSeedPlaced(); pulseHaptic() }
                 is GameEvent.SeedMoved -> { if (soundOn) soundPlayer.playSeedMoved(); pulseHaptic() }
-                is GameEvent.Won -> { if (soundOn) soundPlayer.playVictory(); pulseHaptic() }
+                is GameEvent.Won -> {
+                    if (soundOn) {
+                        // Losing to the machine gets its own darker sting.
+                        if (_uiState.value.gameMode == GameMode.VS_AI && event.player == Player.TWO) {
+                            soundPlayer.playAiVictory()
+                        } else {
+                            soundPlayer.playVictory()
+                        }
+                    }
+                    pulseHaptic()
+                }
                 is GameEvent.Drawn -> pulseHaptic()
                 is GameEvent.MoveRejected -> if (soundOn) soundPlayer.playInvalidMove()
             }

@@ -1,6 +1,5 @@
 package com.threeseeds.app.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,16 +7,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,8 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -100,49 +92,36 @@ fun MainMenuScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
             )
 
-            // Gradient play button: the brush sits behind a transparent button.
-            Box(
-                modifier = Modifier
-                    .width(240.dp)
-                    .height(MIN_BUTTON_HEIGHT)
-                    .background(Brush.linearGradient(listOf(theme.accentColor, theme.playerOne)), RoundedCornerShape(50)),
-                contentAlignment = Alignment.Center
-            ) {
-                Button(
-                    onClick = onPlayLocal,
-                    modifier = Modifier.fillMaxWidth().height(MIN_BUTTON_HEIGHT),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
-                    shape = RoundedCornerShape(50)
-                ) { Text(stringResource(R.string.menu_play_local), fontWeight = FontWeight.Bold) }
-            }
+            // Primary gradient button with 3D press physics.
+            ThreeDButton(
+                onClick = onPlayLocal,
+                variant = Button3DVariant.PRIMARY,
+                modifier = Modifier.width(240.dp).height(MIN_BUTTON_HEIGHT)
+            ) { Text(stringResource(R.string.menu_play_local), fontWeight = FontWeight.Bold) }
 
-            Column(modifier = Modifier.padding(top = 16.dp)) {
-                OutlinedButton(
-                    onClick = onPlayVsAi,
-                    modifier = Modifier.width(240.dp).height(MIN_BUTTON_HEIGHT)
-                ) { Text(stringResource(R.string.menu_play_ai)) }
-            }
+            ThreeDButton(
+                onClick = onPlayVsAi,
+                variant = Button3DVariant.OUTLINE,
+                modifier = Modifier.padding(top = 16.dp).width(240.dp).height(MIN_BUTTON_HEIGHT)
+            ) { Text(stringResource(R.string.menu_play_ai)) }
 
-            Column(modifier = Modifier.padding(top = 16.dp)) {
-                OutlinedButton(
-                    onClick = onPlayNearby,
-                    modifier = Modifier.width(240.dp).height(MIN_BUTTON_HEIGHT)
-                ) { Text(stringResource(R.string.menu_play_nearby)) }
-            }
+            ThreeDButton(
+                onClick = onPlayNearby,
+                variant = Button3DVariant.OUTLINE,
+                modifier = Modifier.padding(top = 16.dp).width(240.dp).height(MIN_BUTTON_HEIGHT)
+            ) { Text(stringResource(R.string.menu_play_nearby)) }
 
-            Column(modifier = Modifier.padding(top = 16.dp)) {
-                OutlinedButton(
-                    onClick = onSettings,
-                    modifier = Modifier.width(240.dp).height(MIN_BUTTON_HEIGHT)
-                ) { Text(stringResource(R.string.menu_settings)) }
-            }
+            ThreeDButton(
+                onClick = onSettings,
+                variant = Button3DVariant.OUTLINE,
+                modifier = Modifier.padding(top = 16.dp).width(240.dp).height(MIN_BUTTON_HEIGHT)
+            ) { Text(stringResource(R.string.menu_settings)) }
 
-            Column(modifier = Modifier.padding(top = 8.dp)) {
-                TextButton(
-                    onClick = { showAbout = true },
-                    modifier = Modifier.width(240.dp).height(MIN_BUTTON_HEIGHT)
-                ) { Text(stringResource(R.string.menu_about)) }
-            }
+            ThreeDButton(
+                onClick = { showAbout = true },
+                variant = Button3DVariant.TEXT,
+                modifier = Modifier.padding(top = 8.dp).width(240.dp).height(MIN_BUTTON_HEIGHT)
+            ) { Text(stringResource(R.string.menu_about)) }
         }
     }
 

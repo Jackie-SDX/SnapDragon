@@ -28,6 +28,7 @@ private class FakeSoundPlayer : SoundPlayer {
     override fun playSeedMoved() { played += "moved" }
     override fun playInvalidMove() { played += "invalid" }
     override fun playVictory() { played += "victory" }
+    override fun playAiVictory() { played += "ai_victory" }
     override fun release() { played += "released" }
 }
 
