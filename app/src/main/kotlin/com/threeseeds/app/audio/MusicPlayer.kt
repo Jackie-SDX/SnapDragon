@@ -35,6 +35,7 @@ class MusicPlayer(context: Context, enabled: Boolean) {
     }
 
     private var intensity = 0f
+    private var ducked = false
     private var animator: ValueAnimator? = null
 
     var enabled: Boolean = enabled
@@ -70,6 +71,16 @@ class MusicPlayer(context: Context, enabled: Boolean) {
         }
     }
 
+    /**
+     * Duck the score (victory sting, dialog): the mix keeps its shape
+     * but drops to a background level while [value] is true.
+     */
+    fun setDucked(value: Boolean) {
+        if (ducked == value) return
+        ducked = value
+        applyMix(intensity)
+    }
+
     fun play() {
         if (!enabled) return
         players.forEach { player ->
@@ -93,9 +104,10 @@ class MusicPlayer(context: Context, enabled: Boolean) {
         val wanted = MusicMix.weights(t)
         val live = players.indices.filter { players[it] != null }
         val liveSum = live.sumOf { wanted[it].toDouble() }.toFloat()
+        val duck = if (ducked) DUCK_FACTOR else 1f
         players.forEachIndexed { index, player ->
             if (player == null) return@forEachIndexed
-            val volume = if (liveSum > 0f) wanted[index] / liveSum * VOLUME else 0f
+            val volume = if (liveSum > 0f) wanted[index] / liveSum * VOLUME * duck else 0f
             runCatching { player.setVolume(volume, volume) }
         }
     }
@@ -106,5 +118,8 @@ class MusicPlayer(context: Context, enabled: Boolean) {
 
         /** Same window as the theme crossfade — one "mood change" language. */
         const val CROSSFADE_MS = 1600L
+
+        /** How far the score drops while a sting owns the moment. */
+        const val DUCK_FACTOR = 0.3f
     }
 }

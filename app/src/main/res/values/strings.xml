@@ -43,6 +43,7 @@
     <string name="about_version">Version %1$s</string>
     <string name="about_author">Created by Jackie (Jackie-SDX)</string>
     <string name="about_source">Source code: github.com/Jackie-SDX/SnapDragon</string>
+    <string name="tutorial_first_run">Tap an empty point to place a seed. After all 6 are down, tap your seed, then a point to move it — line up 3 in a row to win.</string>
     <string name="about_music">Music: \u201cBreves Dies Hominis\u201d sung by Magdalen Kadel (public domain); \u201cThe Project\u201d by Snabisch and \u201cHeartbreak [Demo]\u201d by nene feat. Dantastic (CC BY 3.0, opengameart.org); \u201cEvil Laugh 2\u201d by antumdeluge (CC0).</string>
     <string name="close">Close</string>
 

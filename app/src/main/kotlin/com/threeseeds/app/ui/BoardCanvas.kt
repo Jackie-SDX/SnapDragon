@@ -1,9 +1,11 @@
 package com.threeseeds.app.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -13,7 +15,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +39,7 @@ import com.threeseeds.engine.AdjacencyGraph
 import com.threeseeds.engine.GameState
 import com.threeseeds.engine.Player
 import com.threeseeds.engine.Position
+import kotlinx.coroutines.launch
 
 private val MIN_TOUCH_TARGET = 48.dp
 
@@ -56,6 +61,44 @@ fun BoardCanvas(
         label = "pulse"
     )
     val theme = LocalGameTheme.current
+    val reduceMotion = LocalReduceMotion.current
+
+    // Pop-in: a seed that just landed springs up from scale 0. A vacated
+    // point forgets its animation so a re-placed seed pops again.
+    val seedPops = remember { mutableStateMapOf<Position, Animatable<Float, androidx.compose.animation.core.AnimationVector1D>>() }
+    LaunchedEffect(gameState.board) {
+        for (position in Position.ALL) {
+            if (gameState.board[position] != null) {
+                if (position !in seedPops && !reduceMotion) {
+                    val anim = Animatable(0f)
+                    seedPops[position] = anim
+                    launch {
+                        anim.animateTo(1f, spring(dampingRatio = 0.45f))
+                    }
+                } else if (position !in seedPops) {
+                    seedPops[position] = Animatable(1f)
+                }
+            } else {
+                seedPops.remove(position)
+            }
+        }
+    }
+
+    // Win-line sweep: the winning stroke draws itself across the board
+    // the moment the game is decided, then hands over to the pulse.
+    val sweep = remember { Animatable(0f) }
+    LaunchedEffect(gameState.winningLine) {
+        val line = gameState.winningLine
+        if (line == null) {
+            sweep.snapTo(0f)
+        } else if (reduceMotion) {
+            sweep.snapTo(1f)
+        } else {
+            sweep.snapTo(0f)
+            sweep.animateTo(1f, tween(550))
+        }
+    }
+    val sweepValue = sweep.value
 
     BoxWithConstraints(modifier = modifier) {
         val boardSizeDp = minOf(maxWidth, maxHeight)
@@ -119,13 +162,19 @@ fun BoardCanvas(
                 }
             }
 
-            // Winning line, drawn thicker and pulsing, under the seeds.
+            // Winning line, drawn as a sweep across the line, under the seeds.
             gameState.winningLine?.let { line ->
-                for (i in 0 until line.size - 1) {
+                val segments = line.size - 1
+                val progress = sweepValue * segments
+                for (i in 0 until segments) {
+                    val fraction = (progress - i).coerceIn(0f, 1f)
+                    if (fraction <= 0f) continue
+                    val start = centers.getValue(line[i])
+                    val end = centers.getValue(line[i + 1])
                     drawLine(
                         color = WinningLineColor.copy(alpha = pulse),
-                        start = centers.getValue(line[i]),
-                        end = centers.getValue(line[i + 1]),
+                        start = start,
+                        end = start + (end - start) * fraction,
                         strokeWidth = seedRadiusPx * 0.5f
                     )
                 }
@@ -164,7 +213,9 @@ fun BoardCanvas(
                 val center = centers.getValue(position)
                 val isWinning = gameState.winningLine?.contains(position) == true
                 val isSelected = position == selectedSeed
-                val radius = if (isSelected) seedRadiusPx * (0.95f + 0.1f * pulse) else seedRadiusPx
+                val pop = seedPops[position]?.value ?: if (reduceMotion) 1f else 0f
+                val baseRadius = seedRadiusPx * (0.25f + 0.75f * pop)
+                val radius = if (isSelected) baseRadius * (0.95f + 0.1f * pulse) else baseRadius
 
                 if (isWinning) {
                     drawCircle(WinningLineColor.copy(alpha = pulse), radius * 1.35f, center)

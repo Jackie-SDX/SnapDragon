@@ -66,6 +66,7 @@ fun ThreeDButton(
     label: @Composable () -> Unit
 ) {
     val theme = LocalGameTheme.current
+    val reduceMotion = LocalReduceMotion.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
 
@@ -74,9 +75,17 @@ fun ThreeDButton(
     val dropDepth = if (variant == Button3DVariant.TEXT) 2.dp else 3.dp
     val pressSpring = spring<Dp>(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)
     val scaleSpring = spring<Float>(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium)
-    val drop by animateDpAsState(if (pressed) dropDepth else 0.dp, pressSpring, label = "drop")
-    val lift by animateDpAsState(if (pressed) 0.dp else restDepth, pressSpring, label = "lift")
-    val scale by animateFloatAsState(if (pressed) 0.975f else 1f, scaleSpring, label = "scale")
+    val dropTarget = if (pressed) dropDepth else 0.dp
+    val liftTarget = if (pressed) 0.dp else restDepth
+    val scaleTarget = if (pressed) 0.975f else 1f
+    val dropAnim by animateDpAsState(dropTarget, pressSpring, label = "drop")
+    val liftAnim by animateDpAsState(liftTarget, pressSpring, label = "lift")
+    val scaleAnim by animateFloatAsState(scaleTarget, scaleSpring, label = "scale")
+    // Reduce-motion: the pressed state still shows (it is feedback),
+    // it simply arrives without a spring.
+    val drop = if (reduceMotion) dropTarget else dropAnim
+    val lift = if (reduceMotion) liftTarget else liftAnim
+    val scale = if (reduceMotion) scaleTarget else scaleAnim
 
     val faceBrush = brush ?: when (variant) {
         Button3DVariant.PRIMARY -> Brush.linearGradient(listOf(theme.accentColor, theme.playerOne))

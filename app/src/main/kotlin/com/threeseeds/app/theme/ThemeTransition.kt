@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import com.threeseeds.app.ui.LocalReduceMotion
 
 /**
  * The UI half of the theme transformation: every board/UI color of
@@ -19,7 +20,8 @@ import androidx.compose.ui.graphics.Color
  */
 @Composable
 fun rememberAnimatedTheme(target: GameTheme): GameTheme {
-    val spec = tween<Color>(durationMillis = 500)
+    // Under reduce-motion the palette still changes — it just snaps.
+    val spec = tween<Color>(durationMillis = if (LocalReduceMotion.current) 0 else 500)
 
     val firstStop by animateColorAsState(target.backgroundStops.first(), spec, label = "bg0")
     val lineColor by animateColorAsState(target.lineColor, spec, label = "line")

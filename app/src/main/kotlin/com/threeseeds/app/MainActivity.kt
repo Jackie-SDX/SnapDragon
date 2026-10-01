@@ -5,6 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
@@ -12,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,13 +39,16 @@ import com.threeseeds.app.theme.ThreeSeedsTheme
 import com.threeseeds.app.theme.ThemeCatalog
 import com.threeseeds.app.theme.rememberAnimatedTheme
 import com.threeseeds.app.ui.GameScreen
+import com.threeseeds.app.ui.LocalReduceMotion
 import com.threeseeds.app.ui.MainMenuScreen
 import com.threeseeds.app.ui.NearbyScreen
 import com.threeseeds.app.ui.SettingsScreen
 import com.threeseeds.app.ui.WelcomeScreen
 import com.threeseeds.app.viewmodel.GameViewModel
 import com.threeseeds.app.viewmodel.GameViewModelFactory
+import com.threeseeds.engine.GamePhase
 import kotlinx.coroutines.delay
+import androidx.compose.animation.core.tween
 
 private enum class Screen { WELCOME, MENU, GAME, SETTINGS, NEARBY }
 
@@ -86,6 +97,15 @@ class MainActivity : ComponentActivity() {
             val peers by gameViewModel.peers.collectAsState()
             val linkError by gameViewModel.linkError.collectAsState()
 
+            // System-wide "remove animations" accessibility setting.
+            val reduceMotion = remember {
+                android.provider.Settings.Global.getFloat(
+                    contentResolver,
+                    android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                    1f
+                ) == 0f
+            }
+
             // The equipped theme (profileData.themeId) is persistent and
             // changes ONLY on an explicit user tap. Rotation advances a
             // transient cursor and never writes back into the profile,
@@ -129,6 +149,15 @@ class MainActivity : ComponentActivity() {
                 musicPlayer.setIntensity(uiState.musicIntensity)
             }
 
+            // A decided match hands the mix to the sting: duck the score
+            // while the overlay (and victory sound) plays.
+            LaunchedEffect(uiState.gameState.phase) {
+                musicPlayer.setDucked(
+                    uiState.gameState.phase == GamePhase.WON ||
+                        uiState.gameState.phase == GamePhase.DRAW
+                )
+            }
+
             // Handshake finished in the lobby → straight into the match.
             LaunchedEffect(uiState.linkStatus, currentScreen) {
                 if (uiState.linkStatus == LinkStatus.CONNECTED && currentScreen == Screen.NEARBY) {
@@ -149,13 +178,29 @@ class MainActivity : ComponentActivity() {
             }
 
             ThreeSeedsTheme(theme = theme) {
-                CompositionLocalProvider(LocalGameTheme provides theme) {
+                CompositionLocalProvider(
+                    LocalGameTheme provides theme,
+                    LocalReduceMotion provides reduceMotion
+                ) {
                     ThemedBackground(theme = rawTheme) {
                         // Android 15+ draws edge-to-edge; keep every screen
                         // clear of the status/nav bars (the game's top bar
                         // otherwise sits under the status bar, unreachable).
                         Box(modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars)) {
-                        when (currentScreen) {
+                        AnimatedContent(
+                            targetState = currentScreen,
+                            transitionSpec = {
+                                if (reduceMotion) {
+                                    EnterTransition.None togetherWith ExitTransition.None
+                                } else {
+                                    (fadeIn(tween(240)) +
+                                        slideInHorizontally(tween(280)) { it / 10 }) togetherWith
+                                        fadeOut(tween(160))
+                                }
+                            },
+                            label = "screen"
+                        ) { screen ->
+                        when (screen) {
                             Screen.WELCOME -> WelcomeScreen(
                                 onDone = { chosen ->
                                     profile.update { it.copy(playerName = chosen) }
@@ -190,7 +235,8 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = Screen.MENU
                                 },
                                 onClearInvalidFlash = gameViewModel::clearInvalidFlash,
-                                onClearHint = gameViewModel::clearHint
+                                onClearHint = gameViewModel::clearHint,
+                                firstRun = profileData.wins + profileData.losses + profileData.draws == 0
                             )
 
                             Screen.SETTINGS -> SettingsScreen(
@@ -223,6 +269,7 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = Screen.MENU
                                 }
                             )
+                        }
                         }
                         }
                     }

@@ -1,8 +1,15 @@
 package com.threeseeds.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -55,6 +65,8 @@ import com.threeseeds.engine.GamePhase
 import com.threeseeds.engine.Player
 import com.threeseeds.engine.Position
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.sin
 
 private val MIN_TAP_HEIGHT = 48.dp
 
@@ -70,6 +82,7 @@ fun GameScreen(
     onExitToMenu: () -> Unit,
     onClearInvalidFlash: () -> Unit,
     onClearHint: () -> Unit,
+    firstRun: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
@@ -122,6 +135,15 @@ fun GameScreen(
                     gameState.phase != GamePhase.WON && gameState.phase != GamePhase.DRAW,
                 linkLost = uiState.linkStatus == LinkStatus.LOST
             )
+
+            if (firstRun) {
+                Text(
+                    text = stringResource(R.string.tutorial_first_run),
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                )
+            }
 
             AnimatedVisibility(
                 visible = uiState.aiThinking,
@@ -386,6 +408,9 @@ private fun EndOfGameOverlay(
         modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f), androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.78f)))),
         contentAlignment = Alignment.Center
     ) {
+        if (phase == GamePhase.WON && !LocalReduceMotion.current) {
+            Confetti(modifier = Modifier.fillMaxSize())
+        }
         Card(modifier = Modifier.padding(32.dp), shape = RoundedCornerShape(24.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (phase == GamePhase.WON && winnerNumber != null) {
@@ -442,6 +467,73 @@ private fun EndOfGameOverlay(
                 ) {
                     Text(stringResource(R.string.main_menu))
                 }
+            }
+        }
+    }
+}
+
+private class ConfettiPiece(
+    val startX: Float,
+    val delay: Float,
+    val sizeFrac: Float,
+    val aspect: Float,
+    val colorIndex: Int,
+    val phase: Float,
+    val swayCycles: Float,
+    val spinTurns: Float
+)
+
+/** Falling paper scraps for the win overlay; skipped under reduce-motion. */
+@Composable
+private fun Confetti(modifier: Modifier = Modifier) {
+    val theme = LocalGameTheme.current
+    val colors = listOf(
+        theme.playerOne, theme.playerTwo, theme.accentColor, AccentMagenta, androidx.compose.ui.graphics.Color.White
+    )
+    val pieces = remember {
+        val random = kotlin.random.Random(21)
+        List(70) {
+            ConfettiPiece(
+                startX = random.nextFloat(),
+                delay = random.nextFloat() * 0.7f,
+                sizeFrac = 0.010f + random.nextFloat() * 0.014f,
+                aspect = 0.5f + random.nextFloat() * 1.4f,
+                colorIndex = random.nextInt(colors.size),
+                phase = random.nextFloat() * 2f * PI.toFloat(),
+                swayCycles = 1f + random.nextFloat() * 2f,
+                spinTurns = (if (random.nextBoolean()) 1 else -1) * (1f + random.nextFloat() * 2f)
+            )
+        }
+    }
+    val transition = rememberInfiniteTransition(label = "confetti")
+    val t by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Restart),
+        label = "confetti_progress"
+    )
+
+    Canvas(modifier = modifier) {
+        for (piece in pieces) {
+            val progress = (t + piece.delay) % 1f
+            val w = size.width * piece.sizeFrac
+            val h = w * piece.aspect
+            val sway = sin(progress * piece.swayCycles * 2f * PI.toFloat() + piece.phase) * size.width * 0.035f
+            val x = piece.startX * size.width + sway - w / 2f
+            val y = -h + progress * (size.height + 2f * h)
+            val alpha = (progress * 8f).coerceAtMost(1f) * ((1f - progress) * 5f).coerceAtMost(1f)
+            if (alpha <= 0.02f) continue
+            withTransform({
+                rotate(
+                    degrees = piece.spinTurns * progress * 360f,
+                    pivot = Offset(x + w / 2f, y + h / 2f)
+                )
+            }) {
+                drawRect(
+                    color = colors[piece.colorIndex].copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(w, h)
+                )
             }
         }
     }
