@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.4 — ThreeSeeds v1.4 (2026-10-01)
+
+### Soundtrack with real vocals
+- Three full vocal songs replace the old instrumental loop:
+  "Breves Dies Hominis" (12th-century Latin, public domain, sung by
+  Magdalen Kadel), "The Project" (CC BY, Snabisch) and
+  "Heartbreak [DEMO]" (CC BY, Nene feat. Dantastic) — all from
+  OpenGameArt.org and credited in About.
+- The score mixes dynamically with the match: calm on menus and
+  during placement, building as seeds land and movement drags on,
+  full tension the moment the game is decided — smooth 1.6s
+  crossfades between the three tracks (`MusicMix` + `musicIntensity`).
+- Losing to the machine gets its own sting: "Evil Laugh 2" (CC0 by
+  antumdeluge) instead of the bright victory chime.
+- The soundtrack ducks while a victory sting plays; all tracks are
+  loudness-normalized to -16 LUFS.
+
+### Theme flicker fix & smooth transformation
+- Entering Vs Computer no longer flashes another theme: the displayed
+  theme is derived every frame (no effect-write lag), and every UI
+  color animates over 500ms in step with the background crossfade, so
+  entry, rotation and exit morph instead of snapping — no more
+  mixed-theme frames.
+
+### 3D buttons
+- Every menu action is a physical-feeling 3D button: a depth lip
+  under the face collapses as the button sinks on press, with a
+  springy bounce on release. Primary (gradient), outline and flat
+  variants across menus, overlays and the game toolbar.
+
+### Fluidity & motion
+- Seeds spring in when placed; the winning line draws itself across
+  the board; the win overlay showers confetti.
+- Screens transition with a soft fade/slide.
+- Every animation respects the system "remove animations"
+  accessibility setting: reduce-motion snaps to end states while
+  keeping the feedback (pressed state, theme change, win line).
+- First-run players see a one-line how-to hint on the game screen.
+
+### Fixes
+- Android 15 edge-to-edge: the game's Undo/Restart/Pause bar sat
+  under the status bar and could not be tapped; every screen now
+  respects the system bar insets.
+- Settings music description reflects the new vocal soundtrack.
+
+### Tests
+- 179 JVM tests, all green: the `MusicMix` crossfade curve, the
+  AI-win sting routing (dark sting vs. bright chime), and every prior
+  engine/flow/protocol test.
+
 ## 1.3 — ThreeSeeds v1.3 (2026-10-01)
 
 ### Nearby multiplayer (Wi-Fi / Bluetooth)

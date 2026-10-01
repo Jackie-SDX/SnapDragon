@@ -4,20 +4,22 @@ A 2-player strategy game in the Three Men's Morris / Tapatan family:
 each player has 3 seeds, places them on a 3x3 board, then sends them
 to vacant points trying to line up all 3 in a row.
 
-**Status: ThreeSeeds v1.3 — implemented, unit-tested (174 tests, all
+**Status: ThreeSeeds v1.4 — implemented, unit-tested (179 tests, all
 green), built into an APK, and exercised end-to-end on an Android
 emulator.**
 Two local modes (Pass & Play, Vs Computer with 6 difficulty tiers and
 5 personalities), **nearby multiplayer over Wi-Fi or Bluetooth**, 26
 purchasable board themes with animated motifs (including procedural
-dragon and fountain backdrops), a bundled CC0 soundtrack with a
-Settings toggle, first-run name registration, a coins/stats economy,
-and an About/credits dialog. Physical-device and two-device testing
-still pending — see "What's verified vs. what isn't below."
+dragon and fountain backdrops), a **dynamic vocal soundtrack** (three
+free-licensed songs mixed by game intensity) with a Settings toggle,
+3D press-physics buttons, seed/win-line/confetti animations with
+reduce-motion support, first-run name registration, a coins/stats
+economy, and an About/credits dialog. Physical-device and two-device
+testing still pending — see "What's verified vs. what isn't below."
 
 **Credits**: created by Jackie (Jackie-SDX) —
 https://github.com/Jackie-SDX/SnapDragon. See `CHANGELOG.md` for the
-full v1.3 release notes.
+full v1.4 release notes.
 
 ## Rules
 
@@ -175,8 +177,8 @@ implements a rule itself.
 | `ThemeCatalog` / `ThemedBackground` | The 26-theme inventory and the crossfaded, motif-annotated backdrop every screen sits on |
 | `BoardCanvas` | Renders the board on a `Canvas`, with a parallel layer of individually-labeled, >=48dp tappable targets so TalkBack sees 9 real elements, not one opaque picture |
 | `SettingsRepository` | A handful of booleans in `SharedPreferences` — no DataStore dependency for something this small |
-| `SoundEffects` | `ToneGenerator`-based, asset-free sound effects |
-| `MusicPlayer` | Bundled CC0 soundtrack via `MediaPlayer`, lifecycle-aware, gated by the Settings music toggle |
+| `SoundEffects` | `ToneGenerator`-based move tones plus a bundled CC0 victory sting for the computer's win |
+| `MusicPlayer` | Three bundled vocal tracks via `MediaPlayer` mixed by game intensity (`MusicMix` crossfade), lifecycle-aware, ducking, gated by the Settings music toggle |
 | `net/` (`LinkSession`, `LineTransport`, `WifiLan`, `BluetoothLinks`) | The nearby-play stack: protocol sessions, framed transport, Wi-Fi LAN discovery/link, Bluetooth RFCOMM |
 | `WelcomeScreen` | First-run name registration; the name feeds the menu summary and nearby-play identity |
 | `SettingsStore` / `SoundPlayer` | Interfaces `GameViewModel` actually depends on, so tests can swap in fakes instead of needing a real `Context` or audio system |
@@ -194,10 +196,10 @@ ThreeSeeds/
 │   └── src/test/kotlin/com/threeseeds/engine/    14 files, 87 tests
 ├── app/
 │   ├── src/main/kotlin/com/threeseeds/app/       UI, ViewModel, AI flow, profile, themes, codec, settings, audio, net
-│   ├── src/main/res/                             strings, theme, vector adaptive icon, CC0 soundtrack
-│   ├── src/test/kotlin/com/threeseeds/app/       13 files, 87 tests
+│   ├── src/main/res/                             strings, theme, vector adaptive icon, vocal soundtrack + AI-win sting
+│   ├── src/test/kotlin/com/threeseeds/app/       14 files, 92 tests
 │   └── proguard-rules.pro
-├── CHANGELOG.md                                  release notes (v1.0 → v1.3)
+├── CHANGELOG.md                                  release notes (v1.0 → v1.4)
 ├── keystore.properties.example                   copy to keystore.properties, fill in, never commit
 ├── settings.gradle.kts
 └── build.gradle.kts
@@ -220,7 +222,7 @@ ThreeSeeds/
 
 ## Testing
 
-174 tests total (87 engine + 87 app), all plain Kotlin/JVM — none
+179 tests total (87 engine + 92 app), all plain Kotlin/JVM — none
 need the Android SDK, an emulator, or a device:
 
 ```
@@ -374,9 +376,11 @@ protocol, none of it requiring `:engine` to change.
 - **Orientation**: locked to portrait (per the original brief's
   preference), but game state itself survives configuration changes
   and process death regardless, via `ViewModel` + `SavedStateHandle`.
-- **Sound**: `ToneGenerator`-synthesized SFX (asset-free) plus one
-  bundled CC0 music track ("A New Town" by The Cynic Project,
-  OpenGameArt) — credited in the About dialog.
+- **Sound**: `ToneGenerator`-synthesized move tones (asset-free), a
+  bundled CC0 evil-laugh sting when the computer wins, and a three-song
+  vocal soundtrack ("Breves Dies Hominis" — public domain; "The Project"
+  and "Heartbreak [DEMO]" — CC BY, OpenGameArt) crossfaded by game
+  intensity — all credited in the About dialog.
 - **Permissions**: `INTERNET` (nearby play's sockets) and the
   Bluetooth permissions split by API level (31+ `BLUETOOTH_CONNECT` /
   `BLUETOOTH_SCAN`, ≤30 `BLUETOOTH` + `BLUETOOTH_ADMIN`). No

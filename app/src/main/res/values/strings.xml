@@ -71,7 +71,7 @@
     <!-- Settings -->
     <string name="settings_sound">Sound effects</string>
     <string name="settings_music">Music</string>
-    <string name="settings_music_description">Looped background soundtrack (CC0)</string>
+    <string name="settings_music_description">Dynamic soundtrack: three vocal songs that mix with the match (CC0 / CC BY)</string>
     <string name="settings_haptics">Haptic feedback</string>
     <string name="settings_adjacent">Tapatan-style movement</string>
     <string name="settings_adjacent_description">Seeds slide only along drawn lines. Off: move to any vacant point (the standard rule).</string>
