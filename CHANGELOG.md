@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.3 — ThreeSeeds v1.3 (2026-10-01)
+
+### Nearby multiplayer (Wi-Fi / Bluetooth)
+- New **Nearby play** screen: host or join a match over the same
+  Wi-Fi network (UDP discovery 44771, TCP game link 44772) or a
+  Bluetooth RFCOMM link. The host plays Player One, the joiner
+  Player Two.
+- Host-authoritative `|`-framed line protocol (`HI`, `WELCOME`,
+  `TAP`, `STATE`, `REMATCH`, `BYE`, `ERR`) with percent-escaped
+  fields. The host validates every guest tap through the same
+  `GameEngine` local play uses and broadcasts authoritative state
+  snapshots — a rejected tap is never applied.
+- Lobby with transport switcher and seat info, seat-aware nearby
+  economy (win 8 / draw 5 / loss 4; streaks reset), rematch
+  handshake, and exit-aware disconnect handling ("Connection lost").
+- Writer-thread transport: sends enqueue to a bounded outbox drained
+  by a daemon thread, avoiding `NetworkOnMainThreadException` and
+  keeping UI frames clean.
+- New `net/` package with JVM tests: protocol framing, paired
+  loopback sessions (guest drives both seats), and seat-aware
+  rewards.
+
+### Theme & contrast fixes
+- The equipped theme now actually ships to every screen, including
+  the game board (`LocalGameTheme` provided at the root), and device
+  rotation can no longer overwrite the equipped theme.
+- Theme-derived Material scheme plus a root `ContentColor` fix
+  removed the dark-on-dark text: blackish pixels on the game screen
+  went from 12,451 to 0 (measured by screenshot analysis).
+
+### Richer animated motifs
+- Animated **dragon** backdrop (sine-glide flight, membrane wings,
+  horns, breath puffs) and **fountain** backdrop (triple ballistic
+  jets, basin, droplet tails) drawn procedurally over every theme.
+- Two new themes: **Fountain Court** (150 coins) and **Dragon
+  Realm** (250); Dragon Fire's motif upgraded from embers to the
+  dragon. The catalog now holds **26 themes**.
+
+### Music
+- Bundled CC0 soundtrack **"A New Town"** by The Cynic Project
+  (OpenGameArt), looped under gameplay with a lifecycle-aware
+  `MusicPlayer` (pauses when the app is backgrounded).
+- New **Music** toggle in Settings (on by default); the track is
+  credited in the About dialog.
+
+### Welcome / registration
+- First-run welcome screen picks a display name, persisted in the
+  profile. The name appears on the menu summary and is used as the
+  nearby-play identity instead of the device model.
+
+### App icon
+- Redesigned adaptive launcher icon: gradient backdrop, morris board
+  with the winning diagonal of three seeds, plus a monochrome layer
+  for Android 13+ themed icons.
+
+### Fixes
+- Hosting a new match always starts from a fresh board (re-hosting
+  could previously resume a stale game).
+
+### Verification
+- 174 JVM tests (87 engine + 87 app), all green.
+- On a API 35 emulator: theme persistence and contrast verified by
+  screenshot pixel analysis; a full host-side multiplayer session
+  verified end-to-end against a scripted guest (handshake, moves,
+  state sync, disconnect); music playback/toggle verified in
+  `dumpsys audio`; the welcome flow verified on-device.
+- Not verifiable in this environment: a physical Bluetooth radio,
+  two-device LAN discovery, and a real guest device (guest-side
+  behaviour is covered by JVM tests).
+
 ## 1.2 — ThreeSeeds v1.2 (2026-09-29)
 
 ### Computer opponent (Vs Computer)

@@ -4,7 +4,42 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:fillColor="#F2A93B" android:pathData="M36,36m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0"/>
-    <path android:fillColor="#E8E3D9" android:pathData="M54,54m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0"/>
-    <path android:fillColor="#F2A93B" android:pathData="M72,72m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0"/>
+    <!-- morris board: square + diagonals -->
+    <path
+        android:pathData="M28,28 L80,28 L80,80 L28,80 Z"
+        android:strokeColor="#6B79E8"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M28,28 L80,80"
+        android:strokeColor="#4957C4"
+        android:strokeWidth="3" />
+    <path
+        android:pathData="M80,28 L28,80"
+        android:strokeColor="#4957C4"
+        android:strokeWidth="3" />
+    <!-- empty nodes -->
+    <path android:pathData="M54,28 m-3.5,0 a3.5,3.5 0,1,1 7,0 a3.5,3.5 0,1,1 -7,0" android:fillColor="#A9B0FF" />
+    <path android:pathData="M80,54 m-3.5,0 a3.5,3.5 0,1,1 7,0 a3.5,3.5 0,1,1 -7,0" android:fillColor="#A9B0FF" />
+    <path android:pathData="M54,80 m-3.5,0 a3.5,3.5 0,1,1 7,0 a3.5,3.5 0,1,1 -7,0" android:fillColor="#A9B0FF" />
+    <path android:pathData="M28,54 m-3.5,0 a3.5,3.5 0,1,1 7,0 a3.5,3.5 0,1,1 -7,0" android:fillColor="#A9B0FF" />
+    <path android:pathData="M80,28 m-3.5,0 a3.5,3.5 0,1,1 7,0 a3.5,3.5 0,1,1 -7,0" android:fillColor="#A9B0FF" />
+    <path android:pathData="M28,80 m-3.5,0 a3.5,3.5 0,1,1 7,0 a3.5,3.5 0,1,1 -7,0" android:fillColor="#A9B0FF" />
+    <!-- the winning line of three seeds along the diagonal -->
+    <path
+        android:pathData="M36,36 L72,72"
+        android:strokeColor="#FFB020"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.85" />
+    <path android:pathData="M36,36 m-8,0 a8,8 0,1,1 16,0 a8,8 0,1,1 -16,0"
+        android:fillColor="#FFD24F" android:strokeColor="#F57C00" android:strokeWidth="2.5" />
+    <path android:pathData="M54,54 m-8.5,0 a8.5,8.5 0,1,1 17,0 a8.5,8.5 0,1,1 -17,0"
+        android:fillColor="#FFB020" android:strokeColor="#F57C00" android:strokeWidth="2.5" />
+    <path android:pathData="M72,72 m-8,0 a8,8 0,1,1 16,0 a8,8 0,1,1 -16,0"
+        android:fillColor="#FFD24F" android:strokeColor="#F57C00" android:strokeWidth="2.5" />
+    <!-- seed highlights -->
+    <path android:pathData="M33,33 m-2.5,0 a2.5,2.5 0,1,1 5,0 a2.5,2.5 0,1,1 -5,0" android:fillColor="#FFF6D8" android:fillAlpha="0.9" />
+    <path android:pathData="M51,51 m-2.5,0 a2.5,2.5 0,1,1 5,0 a2.5,2.5 0,1,1 -5,0" android:fillColor="#FFF6D8" android:fillAlpha="0.9" />
+    <path android:pathData="M69,69 m-2.5,0 a2.5,2.5 0,1,1 5,0 a2.5,2.5 0,1,1 -5,0" android:fillColor="#FFF6D8" android:fillAlpha="0.9" />
 </vector>

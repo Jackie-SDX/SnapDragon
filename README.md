@@ -4,16 +4,20 @@ A 2-player strategy game in the Three Men's Morris / Tapatan family:
 each player has 3 seeds, places them on a 3x3 board, then sends them
 to vacant points trying to line up all 3 in a row.
 
-**Status: ThreeSeeds v1.2 — implemented, unit-tested (135 tests, all
-green), and built into a debug APK on a GitHub-hosted Android runner.**
-Two modes (Pass & Play, Vs Computer with 6 difficulty tiers and 5
-personalities), 24 purchasable board themes with animated motifs, a
-coins/stats economy, and an About/credits dialog. Not yet run on a
-physical device — see "What's verified vs. what isn't" below.
+**Status: ThreeSeeds v1.3 — implemented, unit-tested (174 tests, all
+green), built into an APK, and exercised end-to-end on an Android
+emulator.**
+Two local modes (Pass & Play, Vs Computer with 6 difficulty tiers and
+5 personalities), **nearby multiplayer over Wi-Fi or Bluetooth**, 26
+purchasable board themes with animated motifs (including procedural
+dragon and fountain backdrops), a bundled CC0 soundtrack with a
+Settings toggle, first-run name registration, a coins/stats economy,
+and an About/credits dialog. Physical-device and two-device testing
+still pending — see "What's verified vs. what isn't below."
 
 **Credits**: created by Jackie (Jackie-SDX) —
 https://github.com/Jackie-SDX/SnapDragon. See `CHANGELOG.md` for the
-full v1.2 release notes.
+full v1.3 release notes.
 
 ## Rules
 
@@ -44,6 +48,24 @@ full v1.2 release notes.
 - **Pause**: overlay with Resume / Main Menu; game state isn't touched.
 - **Play again** (on the Won/Draw screen): starts a new game without
   leaving the game screen.
+
+## Nearby play
+
+- **Host** on one device, **Join** from another over the same Wi-Fi
+  network or a Bluetooth link (Nearby play → pick a transport →
+  Host/Join). The host is Player One, the joiner Player Two.
+- The link is a host-authoritative `|`-framed line protocol: the
+  guest sends taps, the host validates them through the same
+  `GameEngine` as local play and broadcasts authoritative `STATE`
+  snapshots. Undo is disabled and guest-side restart controls are
+  hidden — only the host runs the match.
+- Nearby matches pay a flat seat-aware reward (win 8 / draw 5 /
+  loss 4) and never extend the VS AI streak. Leaving mid-game shows
+  "Connection lost"; both sides can offer a rematch.
+- Discovery uses UDP broadcast on port 44771 (`TS3-PROBE`) with the
+  game link on TCP 44772; Bluetooth uses RFCOMM with a fixed UUID.
+  Both devices must be on the same network (Wi-Fi) or paired
+  (Bluetooth).
 
 ## Vs Computer
 
@@ -150,10 +172,13 @@ implements a rule itself.
 | `GameStateCodec` | Dependency-free `GameState` <-> `String` for surviving process death via `SavedStateHandle` |
 | `AiPlayer` (engine) | Iterative-deepening negamax with alpha-beta; returns a `Move` the view model replays through `GameEngine` |
 | `Economy` / `ProfileStore` | Pure reward/streak/shop math plus its persistent (SharedPreferences) and in-memory (tests) stores |
-| `ThemeCatalog` / `ThemedBackground` | The 24-theme inventory and the crossfaded, motif-annotated backdrop every screen sits on |
+| `ThemeCatalog` / `ThemedBackground` | The 26-theme inventory and the crossfaded, motif-annotated backdrop every screen sits on |
 | `BoardCanvas` | Renders the board on a `Canvas`, with a parallel layer of individually-labeled, >=48dp tappable targets so TalkBack sees 9 real elements, not one opaque picture |
 | `SettingsRepository` | A handful of booleans in `SharedPreferences` — no DataStore dependency for something this small |
 | `SoundEffects` | `ToneGenerator`-based, asset-free sound effects |
+| `MusicPlayer` | Bundled CC0 soundtrack via `MediaPlayer`, lifecycle-aware, gated by the Settings music toggle |
+| `net/` (`LinkSession`, `LineTransport`, `WifiLan`, `BluetoothLinks`) | The nearby-play stack: protocol sessions, framed transport, Wi-Fi LAN discovery/link, Bluetooth RFCOMM |
+| `WelcomeScreen` | First-run name registration; the name feeds the menu summary and nearby-play identity |
 | `SettingsStore` / `SoundPlayer` | Interfaces `GameViewModel` actually depends on, so tests can swap in fakes instead of needing a real `Context` or audio system |
 
 Selection state (which seed is currently tapped) lives in `GameUiState`,
@@ -166,13 +191,13 @@ would ever need to sync in a networked game.
 ThreeSeeds/
 ├── engine/
 │   ├── src/main/kotlin/com/threeseeds/engine/    15 files: the rules + the AI
-│   └── src/test/kotlin/com/threeseeds/engine/    13 files, 85 tests
+│   └── src/test/kotlin/com/threeseeds/engine/    14 files, 87 tests
 ├── app/
-│   ├── src/main/kotlin/com/threeseeds/app/       UI, ViewModel, AI flow, profile, themes, state codec, settings, audio
-│   ├── src/main/res/                             strings, theme, adaptive icon (vector, no raster assets)
-│   ├── src/test/kotlin/com/threeseeds/app/       6 files, 50 tests
+│   ├── src/main/kotlin/com/threeseeds/app/       UI, ViewModel, AI flow, profile, themes, codec, settings, audio, net
+│   ├── src/main/res/                             strings, theme, vector adaptive icon, CC0 soundtrack
+│   ├── src/test/kotlin/com/threeseeds/app/       13 files, 87 tests
 │   └── proguard-rules.pro
-├── CHANGELOG.md                                  release notes (v1.0 → v1.2)
+├── CHANGELOG.md                                  release notes (v1.0 → v1.3)
 ├── keystore.properties.example                   copy to keystore.properties, fill in, never commit
 ├── settings.gradle.kts
 └── build.gradle.kts
@@ -195,8 +220,8 @@ ThreeSeeds/
 
 ## Testing
 
-135 tests total (85 engine + 50 app), all plain Kotlin/JVM — none need
-the Android SDK, an emulator, or a device:
+174 tests total (87 engine + 87 app), all plain Kotlin/JVM — none
+need the Android SDK, an emulator, or a device:
 
 ```
 ./gradlew test              # everything
@@ -210,10 +235,11 @@ which is why it depends on the `SettingsStore`/`SoundPlayer`
 interfaces instead of the concrete Android-backed classes directly.
 
 **Not covered by automated tests**: actual on-screen rendering,
-real touch input, TalkBack behavior, and anything requiring an
-emulator or device (Compose UI/instrumented tests). That needs Android
-Studio's device tooling, which this sandbox doesn't have — see "What's
-verified vs. what isn't" below.
+real touch input, TalkBack behavior, and anything requiring two
+physical devices (Compose UI/instrumented tests). Rendering, touch
+input, theme contrast, music playback, and the host side of nearby
+play were instead verified by scripted interaction on an API 35
+emulator — see "What's verified vs. what isn't" below.
 
 ## Build instructions
 
@@ -281,7 +307,7 @@ versions reliably produce an equivalent APK.
 
 ## What's verified vs. what isn't
 
-- **`:engine`**: fully verified. The suite grew to 105 tests, including
+- **`:engine`**: fully verified by 87 plain-JVM tests, including
   an exhaustive conformance sweep of every labelled 3-vs-3 board
   (1,680 boards × both players × all origins) against a reference model
   derived independently from the eight winning lines — checked under
@@ -292,12 +318,24 @@ versions reliably produce an equivalent APK.
   blocked tap never moves a seed.
 - **Build**: `gradle :app:assembleDebug` produces an installable APK
   (published on the GitHub releases page of this repository).
-- **Not yet verified**: behaviour on a physical device/emulator —
-  haptics, sound, and touch feel are only code-reviewed at this point.
+- **Emulator (API 35)**: verified by scripted interaction and
+  screenshot analysis — theme selection persists and renders, the
+  dark-on-dark contrast bug is gone (blackish pixels 12,451 → 0),
+  the welcome flow registers and persists a name, music starts,
+  toggles, and pauses with the lifecycle (checked in `dumpsys
+  audio`), and a full nearby-play host session ran against a
+  scripted guest: handshake → seeded board → taps from both sides →
+  state sync → disconnect handling.
+- **Not verified**: physical devices, haptics/feel on real hardware,
+  a real Bluetooth radio (the emulator has none), two-device LAN
+  discovery, and the guest client on a second device (guest-side
+  protocol behaviour is covered by JVM tests).
 
-## Future online multiplayer architecture
+## Nearby multiplayer & future online play
 
-Not implemented, but the engine was built for it:
+Nearby (same-network / Bluetooth) multiplayer is implemented — see
+the "Nearby play" section above. A true internet-wide mode is still
+future work, but the engine was built for it:
 
 - `GameEngine.apply(Move)` is the same call a server-authoritative
   session would make — the engine has no notion of "trusted" vs.
@@ -312,11 +350,11 @@ Not implemented, but the engine was built for it:
 - `GameState` is fully immutable and serializable (see
   `GameStateCodec` for a working example of encoding it compactly).
 
-What online play would still need: a matchmaking/room service, an
-`Engine`-per-match on a server applying only server-validated moves,
-a thin network `Move` transport, reconnection handling, and (if
-wanted) accounts, match history, and leaderboards — all additive on
-top of the existing engine, none of it requiring `:engine` to change.
+Global online play would still need: a matchmaking/room service
+(nearby play already discovered the missing piece), server-side
+reconnection handling, and (if wanted) accounts, match history, and
+leaderboards — all additive on top of the existing host-authoritative
+protocol, none of it requiring `:engine` to change.
 
 ## Known assumptions
 
@@ -336,8 +374,12 @@ top of the existing engine, none of it requiring `:engine` to change.
 - **Orientation**: locked to portrait (per the original brief's
   preference), but game state itself survives configuration changes
   and process death regardless, via `ViewModel` + `SavedStateHandle`.
-- **Sound**: `ToneGenerator`-synthesized tones rather than bundled
-  audio files — sidesteps any question of where sound assets came
-  from, at the cost of sounding more "system beep" than "game jingle."
-- **No permissions requested**: no `INTERNET` (fully offline), no
-  `VIBRATE` (Compose's haptic feedback API doesn't need it).
+- **Sound**: `ToneGenerator`-synthesized SFX (asset-free) plus one
+  bundled CC0 music track ("A New Town" by The Cynic Project,
+  OpenGameArt) — credited in the About dialog.
+- **Permissions**: `INTERNET` (nearby play's sockets) and the
+  Bluetooth permissions split by API level (31+ `BLUETOOTH_CONNECT` /
+  `BLUETOOTH_SCAN`, ≤30 `BLUETOOTH` + `BLUETOOTH_ADMIN`). No
+  location permission — targetSdk 36 treats local-network access as
+  implicit for the discovery sockets. No `VIBRATE` (Compose's
+  haptic feedback API doesn't need it).
