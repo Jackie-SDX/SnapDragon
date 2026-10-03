@@ -1,0 +1,367 @@
+{
+  "slug": "asthma-attack",
+  "topic": "What happens inside your airway during an asthma attack",
+  "title": "ASTHMA ATTACK",
+  "subtitle": "what happens inside your airway",
+  "fps": 24,
+  "render_width": 720,
+  "render_height": 1280,
+  "output_width": 1080,
+  "output_height": 1920,
+  "voice": {
+    "id": "en_US-joe-medium",
+    "length_scale": 1.0
+  },
+  "beats": [
+    {
+      "id": "hook",
+      "narration": "This is what an asthma attack does to the inside of your airway.",
+      "state": {
+        "muscle": 0.1,
+        "inflame": 0.0,
+        "mucus": 0.0,
+        "flow": 0.6
+      },
+      "camera": [
+        0.5,
+        -9.3,
+        0.5
+      ],
+      "target": [
+        0,
+        0,
+        0.2
+      ],
+      "labels": [
+        {
+          "text": "ASTHMA ATTACK",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.39,
+          "color": [
+            1.0,
+            0.95,
+            0.9
+          ],
+          "pop": 0.25
+        },
+        {
+          "text": "what happens inside your airway",
+          "pos": [
+            0,
+            0.58
+          ],
+          "size": 0.26,
+          "color": [
+            0.55,
+            0.85,
+            1.0
+          ],
+          "pop": 0.45
+        }
+      ]
+    },
+    {
+      "id": "healthy",
+      "narration": "A healthy airway is a wide, flexible tube, and air flows through it easily.",
+      "state": {
+        "muscle": 0.0,
+        "inflame": 0.0,
+        "mucus": 0.0,
+        "flow": 1.0
+      },
+      "camera": [
+        0.0,
+        -7.4,
+        0.0
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "labels": [
+        {
+          "text": "HEALTHY AIRWAY",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.34,
+          "color": [
+            0.55,
+            1.0,
+            0.75
+          ],
+          "pop": 0.2
+        }
+      ]
+    },
+    {
+      "id": "trigger",
+      "narration": "When you meet a trigger like pollen, smoke or a cold, your airways overreact.",
+      "state": {
+        "muscle": 0.3,
+        "inflame": 0.45,
+        "mucus": 0.1,
+        "flow": 0.8
+      },
+      "camera": [
+        -1.8,
+        -7.0,
+        0.7
+      ],
+      "target": [
+        0,
+        0,
+        0.1
+      ],
+      "labels": [
+        {
+          "text": "TRIGGER",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.42,
+          "color": [
+            1.0,
+            0.8,
+            0.4
+          ],
+          "pop": 0.2
+        },
+        {
+          "text": "pollen  smoke  cold air",
+          "pos": [
+            0,
+            -0.78
+          ],
+          "size": 0.28,
+          "color": [
+            1.0,
+            0.85,
+            0.6
+          ],
+          "pop": 0.45
+        }
+      ]
+    },
+    {
+      "id": "constrict",
+      "narration": "The muscle around the tube squeezes tight, like a fist closing around it.",
+      "state": {
+        "muscle": 1.0,
+        "inflame": 0.6,
+        "mucus": 0.15,
+        "flow": 0.45
+      },
+      "camera": [
+        2.6,
+        -6.0,
+        -0.6
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "labels": [
+        {
+          "text": "MUSCLE CONTRACTS",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.32,
+          "color": [
+            1.0,
+            0.5,
+            0.5
+          ],
+          "pop": 0.2
+        }
+      ]
+    },
+    {
+      "id": "swell",
+      "narration": "The lining swells and thick mucus fills the gap.",
+      "state": {
+        "muscle": 0.9,
+        "inflame": 1.0,
+        "mucus": 0.7,
+        "flow": 0.25
+      },
+      "camera": [
+        -1.6,
+        -6.2,
+        0.7
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "labels": [
+        {
+          "text": "SWELLING + MUCUS",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.3,
+          "color": [
+            1.0,
+            0.7,
+            0.7
+          ],
+          "pop": 0.2
+        }
+      ]
+    },
+    {
+      "id": "blocked",
+      "narration": "In seconds, the opening can narrow to a fraction of its size. That is the wheeze.",
+      "state": {
+        "muscle": 1.0,
+        "inflame": 1.0,
+        "mucus": 1.0,
+        "flow": 0.06
+      },
+      "camera": [
+        0.3,
+        -6.8,
+        0.0
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "labels": [
+        {
+          "text": "AIRWAY NARROWS",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.34,
+          "color": [
+            1.0,
+            0.45,
+            0.4
+          ],
+          "pop": 0.2
+        },
+        {
+          "text": "airflow drops  =  wheeze",
+          "pos": [
+            0,
+            -0.78
+          ],
+          "size": 0.28,
+          "color": [
+            1.0,
+            0.6,
+            0.55
+          ],
+          "pop": 0.45
+        }
+      ]
+    },
+    {
+      "id": "relief",
+      "narration": "A reliever inhaler relaxes that muscle within minutes, and air rushes back in.",
+      "state": {
+        "muscle": 0.12,
+        "inflame": 0.3,
+        "mucus": 0.2,
+        "flow": 1.3
+      },
+      "camera": [
+        -2.2,
+        -7.2,
+        1.0
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "labels": [
+        {
+          "text": "RELIEVER WORKS",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.36,
+          "color": [
+            0.55,
+            1.0,
+            0.8
+          ],
+          "pop": 0.2
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "narration": "Asthma is manageable. Know your triggers, keep your plan close, and seek help early.",
+      "state": {
+        "muscle": 0.08,
+        "inflame": 0.15,
+        "mucus": 0.1,
+        "flow": 1.0
+      },
+      "camera": [
+        0.0,
+        -9.3,
+        0.3
+      ],
+      "target": [
+        0,
+        0,
+        0.1
+      ],
+      "labels": [
+        {
+          "text": "ASTHMA IS MANAGEABLE",
+          "pos": [
+            0,
+            0.78
+          ],
+          "size": 0.24,
+          "color": [
+            0.6,
+            1.0,
+            0.85
+          ],
+          "pop": 0.2
+        },
+        {
+          "text": "educational content - not medical advice",
+          "pos": [
+            0,
+            -0.78
+          ],
+          "size": 0.19,
+          "color": [
+            0.7,
+            0.75,
+            0.85
+          ],
+          "pop": 0.45
+        }
+      ]
+    }
+  ],
+  "sources": [
+    "NHLBI NIH - Asthma Attacks: https://www.nhlbi.nih.gov/health/asthma/attacks",
+    "NICE NG80 Asthma management: https://www.nice.org.uk/guidance/ng80",
+    "GINA Science: https://ginasthma.org/science/"
+  ],
+  "disclaimer": "Educational content, not medical advice."
+}
