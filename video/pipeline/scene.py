@@ -37,7 +37,6 @@ for tb in BEATS:
     tb["labels"] = pb.get("labels", [])
 
 # camera framing: portrait vertical FOV half-extent factor = (sensor/2)/lens
-CAM = bpy.data.cameras.new("CamProbe") if False else None
 LENS = 35.0
 SENSOR_HALF = 12.0  # mm; sensor_fit VERTICAL fits sensor_height (24mm) vertically
 HALF_H_PER_UNIT = SENSOR_HALF / LENS  # half height at depth d = d * HALF_H_PER_UNIT
