@@ -5,6 +5,7 @@ Everything here is free: FFmpeg filters only, BGM is synthesized (public domain 
 CC0 by construction), captions styled with libass using DejaVu fonts.
 """
 import argparse
+import glob
 import json
 import os
 import subprocess
@@ -158,13 +159,19 @@ def main():
          "-map", "[m]", "-ac", "2", "-ar", "48000", mix])
 
     # frames + captions + scale + encode
+    seq = sorted(glob.glob(os.path.join(args.frames, "f_*.png")))
+    if not seq:
+        print(f"no rendered frames in {args.frames}", flush=True)
+        sys.exit(2)
+    pad = len(os.path.basename(seq[0]).split("_")[1].split(".")[0])
+    print(f"frames: {len(seq)} (padding {pad})", flush=True)
     vf = (
         f"scale={W}:{H}:flags=lanczos,"
         f"subtitles={ass}:fontsdir=/usr/share/fonts/truetype/dejavu,"
         "format=yuv420p"
     )
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-         "-framerate", str(fps), "-i", os.path.join(args.frames, "f_%05d.png"),
+         "-framerate", str(fps), "-i", os.path.join(args.frames, f"f_%0{pad}d.png"),
          "-i", mix,
          "-vf", vf,
          "-c:v", "libx264", "-preset", "medium", "-crf", "19",

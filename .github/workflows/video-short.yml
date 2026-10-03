@@ -1,0 +1,85 @@
+name: video-short
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Path to the short project JSON"
+        required: true
+        default: "video/projects/asthma-attack.json"
+      samples:
+        description: "EEVEE render samples per frame"
+        required: false
+        default: "8"
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies (Blender, FFmpeg, Xvfb, fonts)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            blender xvfb libgl1 libgl1-mesa-dri mesa-utils fonts-dejavu-core ffmpeg
+          blender --version | head -n 1
+          ffmpeg -version | head -n 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Piper TTS (free, GPL)
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install "piper-tts==1.8.0"
+          python -c "import piper; print('piper ok')"
+
+      - name: Cache Piper voice
+        uses: actions/cache@v4
+        with:
+          path: work/voices
+          key: piper-voice-en_US-joe-medium-v1
+
+      - name: Run pipeline (TTS -> Blender EEVEE -> FFmpeg)
+        run: |
+          set -euo pipefail
+          python video/pipeline/pipeline.py \
+            --project "${{ inputs.project }}" \
+            --work work \
+            --samples "${{ inputs.samples }}"
+
+      - name: Report timings
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "### Short render report"
+            echo '```json'
+            cat work/timings.json 2>/dev/null || echo '{}'
+            echo '```'
+            echo '```json'
+            cat work/output-meta.json 2>/dev/null || echo '{}'
+            echo '```'
+            ls -lh work/final.mp4 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload video artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: short-video
+          if-no-files-found: error
+          path: |
+            work/final.mp4
+            work/timings.json
+            work/output-meta.json
