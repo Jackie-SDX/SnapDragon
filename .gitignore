@@ -28,4 +28,5 @@ agent-eval-results.jsonl
 
 # OS / editor noise
 .DS_Store
-Thumbs.db
+Thumbs.db__pycache__/
+*.pyc
