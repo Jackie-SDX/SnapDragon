@@ -193,6 +193,10 @@ back.data.materials.append(mat_back)
 
 # ---- mucus blobs (radius driven relative to pinched lumen in apply_frame)
 mat_mucus = principled_mat("Mucus", (0.93, 0.9, 0.6), rough=0.25)
+_mb = mat_mucus.node_tree.nodes["Principled BSDF"]
+if "Emission Color" in _mb.inputs:
+    _mb.inputs["Emission Color"].default_value = (0.93, 0.9, 0.6, 1)
+    _mb.inputs["Emission Strength"].default_value = 0.32
 mucus_objs = []
 mucus_specs = [
     ((0.0, -0.6, 0.15), 0.62),
@@ -212,8 +216,8 @@ for pos, r in mucus_specs:
     mucus_objs.append((o, Vector(pos), r))
 
 # ---- airflow particles
-mat_air = emission_mat("AirPart", (0.75, 0.95, 1.0), 1.4)
-bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.075)
+mat_air = emission_mat("AirPart", (0.75, 0.95, 1.0), 1.0)
+bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=0.075)
 proto = bpy.context.object
 proto.data.materials.append(mat_air)
 proto.hide_render = True
@@ -261,6 +265,15 @@ def area(name, loc, energy, color, size=5.0):
 area("Key", (-5.0, -7.0, 5.0), 520, (1.0, 0.96, 0.9))
 area("RimBlue", (6.0, -2.0, 2.5), 400, (0.55, 0.7, 1.0))
 area("RimWarm", (-1.5, 6.5, -2.0), 320, (1.0, 0.5, 0.4))
+
+# soft light inside the bore so mucus / inner wall never go pitch black
+_bore = bpy.data.lights.new("Bore", "POINT")
+_bore.energy = 120
+_bore.color = (1.0, 0.93, 0.85)
+_bore.shadow_soft_size = 1.5
+_bo = bpy.data.objects.new("Bore", _bore)
+scene.collection.objects.link(_bo)
+_bo.location = (0, -1.2, 0)
 
 # ---- camera
 cam_data = bpy.data.cameras.new("Cam")
@@ -356,7 +369,7 @@ def apply_frame(t):
         y = -2.75 + prog * 5.5
         rad = lr * frac
         o.location = (rad * math.cos(ang), y, rad * math.sin(ang))
-        s = clamp(0.4 + st["flow"], 0.25, 1.4)
+        s = clamp(0.4 + st["flow"], 0.25, 1.1)
         o.scale = (s, s, s)
 
     # trigger motes only inside the trigger beat
@@ -390,8 +403,9 @@ def apply_frame(t):
     for o, bi, spec in label_objs:
         s = label_scale_at(BEATS[bi], spec, t)
         pos = spec.get("pos", [0, 0])
-        xf = pos[0] if len(pos) >= 1 else 0.0
+        xf = clamp(pos[0] if len(pos) >= 1 else 0.0, -0.9, 0.9)
         yf = pos[2] if len(pos) == 3 else (pos[1] if len(pos) == 2 else 0.0)
+        yf = clamp(yf * 0.26 if len(pos) == 3 else yf, -0.9, 0.9)
         o.location = (xf * half_w, yf * half_h, -depth)
         o.scale = (s * size_k, s * size_k, s * size_k)
 
