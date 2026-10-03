@@ -95,11 +95,11 @@ def build_narration(timeline, project, out_wav, workdir):
         inputs += ["-i", wav]
         delays.append(tb)
     n = len(timeline["beats"])
-    fc = [f"[0:a]asplit=2[bed][bed2]"]
+    fc = []
     for i, tb in enumerate(timeline["beats"]):
         fc.append(f"[{i+1}:a]aresample=44100,adelay={int(tb['start']*1000)}|{int(tb['start']*1000)}[v{i}]")
-    fc.append("[" + "".join(f"[v{i}]" for i in range(n)) + f"amix=inputs={n}:normalize=0[mx]")
-    fc.append("[bed][mx]amix=inputs=2:normalize=0:dropout_transition=0,apad,atrim=0:{}[nar]".format(total))
+    fc.append("".join(f"[v{i}]" for i in range(n)) + f"amix=inputs={n}:normalize=0[mx]")
+    fc.append("[0:a][mx]amix=inputs=2:normalize=0:dropout_transition=0,apad,atrim=0:{}[nar]".format(total))
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *inputs,
          "-filter_complex", ";".join(fc), "-map", "[nar]", "-ac", "2", "-ar", "44100", out_wav])
 
@@ -113,8 +113,8 @@ def build_bgm(total, out_wav):
         "sine=frequency=220:duration={t}[c];"
         "anoisesrc=color=brown:duration={t}:amplitude=0.35[n];"
         "[a]volume=0.30,tremolo=f=0.13:d=0.55[a1];"
-        "[b]volume=0.20,tremolo=f=0.09:d=0.45[b1];"
-        "[c]volume=0.13,tremolo=f=0.07:d=0.4[c1];"
+        "[b]volume=0.20,tremolo=f=0.11:d=0.45[b1];"
+        "[c]volume=0.13,tremolo=f=0.1:d=0.4[c1];"
         "[n]lowpass=f=420,volume=0.5[n1];"
         "[a1][b1][c1][n1]amix=inputs=4:normalize=0,"
         "lowpass=f=900,aecho=0.7:0.5:220:0.18,"
