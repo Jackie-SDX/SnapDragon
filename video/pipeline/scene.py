@@ -347,7 +347,7 @@ def apply_frame(t):
         s = final_r / r
         o.scale = (s, s, s)
         o.location = Vector((pos[0] * pinch, pos[1], pos[2] * pinch))
-        o.visible = st["mucus"] > 0.02
+        o.hide_render = st["mucus"] <= 0.02
 
     lr = hole_r * 0.82
     speed = st["flow"] * 3.6
