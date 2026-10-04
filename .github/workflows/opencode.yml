@@ -220,7 +220,7 @@ jobs:
       - name: Persist native OpenCode session artifact
         if: always() && steps.attempt_1.outputs.native_session_export_file != '' && steps.attempt_1.outputs.native_session_artifact != ''
         continue-on-error: true
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.attempt_1.outputs.native_session_artifact }}
           path: ${{ steps.attempt_1.outputs.native_session_export_file }}
