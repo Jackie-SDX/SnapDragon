@@ -46,7 +46,7 @@ jobs:
           python -c "import piper; print('piper ok')"
 
       - name: Cache Piper voice
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: work/voices
           key: piper-voice-en_US-joe-medium-v1
