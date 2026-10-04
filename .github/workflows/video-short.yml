@@ -18,7 +18,7 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
 
     steps:
       - name: Checkout

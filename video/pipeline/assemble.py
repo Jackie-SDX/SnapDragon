@@ -104,6 +104,35 @@ def build_narration(timeline, project, out_wav, workdir):
          "-filter_complex", ";".join(fc), "-map", "[nar]", "-ac", "2", "-ar", "44100", out_wav])
 
 
+def build_sfx(timeline, out_wav):
+    """Whoosh transition at each hard cut (beat boundaries, skip first)."""
+    total = timeline["total"]
+    cuts = [b["end"] for b in timeline["beats"][:-1]]
+    if not cuts:
+        run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+             "-f", "lavfi", "-t", f"{total}", "-i", "anullsrc=r=44100:cl=stereo",
+             "-ac", "2", "-ar", "44100", out_wav])
+        return 0
+    inputs = ["-f", "lavfi", "-t", f"{total}", "-i", "anullsrc=r=44100:cl=stereo"]
+    for _ in cuts:
+        inputs += ["-f", "lavfi", "-t", "0.7", "-i",
+                   "anoisesrc=color=pink:duration=0.7:amplitude=0.5"]
+    fc = []
+    n = len(cuts)
+    for i, ct in enumerate(cuts):
+        d = int(max(ct - 0.10, 0) * 1000)
+        fc.append(
+            f"[{i+1}:a]highpass=f=320,lowpass=f=5600,"
+            f"afade=t=in:d=0.13:curve=qsin,afade=t=out:st=0.30:d=0.40,"
+            f"volume=0.5,adelay={d}|{d}[w{i}]"
+        )
+    fc.append("".join(f"[w{i}]" for i in range(n)) + f"amix=inputs={n}:normalize=0[sx]")
+    fc.append(f"[0:a][sx]amix=inputs=2:normalize=0:dropout_transition=0,apad,atrim=0:{total}[out]")
+    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *inputs,
+         "-filter_complex", ";".join(fc), "-map", "[out]", "-ac", "2", "-ar", "44100", out_wav])
+    return n
+
+
 def build_bgm(total, out_wav):
     """Synthesize a soft ambient pad with FFmpeg (generated = CC0/public domain)."""
     # three slow sine layers + filtered noise bed, gently evolving
@@ -142,19 +171,22 @@ def main():
 
     narr = os.path.join(args.work, "narration.wav")
     bgm = os.path.join(args.work, "bgm.wav")
+    sfx = os.path.join(args.work, "sfx.wav")
     mix = os.path.join(args.work, "mix.wav")
     ass = os.path.join(args.work, "captions.ass")
 
     build_narration(timeline, project, narr, args.work)
     build_bgm(total, bgm)
+    n_cuts = build_sfx(timeline, sfx)
     n_events = build_ass(timeline, project, ass)
-    print(f"captions: {n_events} events", flush=True)
+    print(f"captions: {n_events} events, whooshes: {n_cuts}", flush=True)
 
-    # mix narration (loud) + bgm (ducked)
+    # mix narration (loud) + bgm (ducked) + cut whooshes
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-         "-i", narr, "-i", bgm,
+         "-i", narr, "-i", bgm, "-i", sfx,
          "-filter_complex",
-         "[1:a]volume=0.55[bg];[0:a][bg]amix=inputs=2:normalize=0,"
+         "[1:a]volume=0.55[bg];[2:a]volume=0.8[sx];"
+         "[0:a][bg][sx]amix=inputs=3:normalize=0:dropout_transition=0,"
          "loudnorm=I=-16:TP=-1.5:LRA=9,atrim=0:{}[m]".format(total),
          "-map", "[m]", "-ac", "2", "-ar", "48000", mix])
 
@@ -168,7 +200,11 @@ def main():
     vf = (
         f"scale={W}:{H}:flags=lanczos,"
         f"subtitles={ass}:fontsdir=/usr/share/fonts/truetype/dejavu,"
-        "format=yuv420p"
+        "eq=contrast=1.05:saturation=1.10,"
+        "colorbalance=rs=0.03:bs=-0.03:rm=0.02:bm=-0.02,"
+        "vignette=angle=PI/4.6,"
+        "format=yuv420p,"
+        "noise=alls=6:allf=t+u"
     )
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
          "-framerate", str(fps), "-i", os.path.join(args.frames, f"f_%0{pad}d.png"),
