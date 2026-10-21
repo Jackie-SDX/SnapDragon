@@ -1,0 +1,92 @@
+{
+  "fps": 24,
+  "render_width": 720,
+  "render_height": 1280,
+  "output_width": 1080,
+  "output_height": 1920,
+  "voice": { "id": "en_US-joe-medium", "length_scale": 1.05 },
+  "char_sources": "assets/characters",
+  "characters": {
+    "lungs": "1792603088568",
+    "airway": "1792603102531",
+    "salbutamol": "1792603058580",
+    "beta2": "1792603117805",
+    "adrenaline": "1792603074500",
+    "camp": "1792603134426"
+  },
+  "stage": { "bg": [0.97, 0.965, 0.95], "view_height": 8.0 },
+  "beats": [
+    {
+      "id": "hook",
+      "narration": "During an asthma attack, even your lungs start to panic.",
+      "camera": { "scale": [8.2, 7.9], "pan": [0, 0.25, 0, 0.2] },
+      "chars": [
+        {
+          "ref": "lungs",
+          "x": 0.0,
+          "y": -1.45,
+          "h": 3.1,
+          "enter": "pop",
+          "move": "tremble",
+          "tremble": 0.05,
+          "bob": 0.045,
+          "squash_at": [0.7, 1.9]
+        }
+      ]
+    },
+    {
+      "id": "squeeze",
+      "narration": "The airways squeeze shut when they should stay open.",
+      "camera": { "scale": [7.7, 6.7], "pan": [0, 0.1, 0, 0.05] },
+      "chars": [
+        {
+          "ref": "airway",
+          "x": 0.0,
+          "y": -1.55,
+          "h": 3.5,
+          "enter": "pop",
+          "move": "tremble",
+          "tremble": 0.06,
+          "bob": 0.03,
+          "squash_at": [0.45, 1.35, 2.3]
+        }
+      ]
+    },
+    {
+      "id": "rescue",
+      "narration": "Salbutamol, the rescue inhaler, rushes in to help.",
+      "camera": { "scale": [8.0, 7.85], "pan": [0, 0.15, 0, 0.15] },
+      "chars": [
+        {
+          "ref": "salbutamol",
+          "x": 0.7,
+          "y": -1.75,
+          "h": 3.7,
+          "enter": "slide_right",
+          "slide_from": 5.2,
+          "move": "idle",
+          "bob": 0.05,
+          "squash_at": [1.1]
+        }
+      ]
+    },
+    {
+      "id": "signal",
+      "narration": "It hits the receptors and tells the muscle to relax.",
+      "camera": { "scale": [7.9, 7.4], "pan": [0, 0.0, 0, 0.0] },
+      "chars": [
+        {
+          "ref": "beta2",
+          "x": 0.0,
+          "y": -1.3,
+          "h": 2.9,
+          "enter": "pop",
+          "move": "flex",
+          "flex": 0.03,
+          "bob": 0.04,
+          "squash_at": [0.8, 2.0]
+        }
+      ]
+    }
+  ]
+}
