@@ -72,21 +72,21 @@ def dilate3(mask):
 
 
 def inpaint_patches(rgba, spec):
-    """Erase each feature polygon on the body, fill with ring-median color.
+    """Erase each feature polygon on the body, fill with the body's flat blue.
 
-    Ring median samples a 24px band just outside the hole; the body's blue
-    gradient is gentle enough that a flat fill + slight blur reads clean.
+    Sample the median of clearly-blue pixels in the body bbox so the fill
+    matches the (gently varying) torso; face parts then sit exactly on top.
     """
     a = np.asarray(rgba).astype(np.float32).copy()
     H, W = a.shape[:2]
+    r, g, b, _ = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    blueish = (b > 110) & (b > r + 40) & (b > g + 10) & (r < 160)
+    fill = np.median(a[blueish], axis=0) if blueish.any() else np.array([40, 130, 210, 255], np.float32)
+    fill[3] = 255.0
     for job in spec["inpaint"]:
         hole = next(p for p in spec["parts"] if p["name"] == job["hole"])
         hm = poly_mask((W, H), hole["poly"], erode=False) > 0.5
-        ring = dilate3(dilate3(dilate3(hm))) & ~hm
-        if ring.sum() < 100:
-            continue
-        fill = np.median(a[ring], axis=0)
-        soft = Image.fromarray((hm * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(4))
+        soft = Image.fromarray((hm * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3))
         sf = (np.asarray(soft).astype(np.float32) / 255.0)[..., None]
         patch = np.empty_like(a)
         patch[:] = fill
@@ -166,14 +166,17 @@ def main():
         }
         print(f"{p['name']}: {crop.size} pivot={pivot}")
 
-    # body = full keyed sprite minus every part polygon (dilated so no limb
-    # slivers survive at joints), features inpainted with ring-median fill
+    # body = full keyed sprite minus every part polygon, features inpainted
     body_alpha = alpha.copy()
+    features = {"brow_l", "brow_r", "eye_l", "eye_r", "mouth"}
     for name in spec["body_remove"]:
         p = next(q for q in spec["parts"] if q["name"] == name)
-        rm = poly_mask((W, H), p["poly"], erode=False)
-        rm = dilate3(dilate3(dilate3(rm)))  # ~6px dilation eats join slivers
-        body_alpha = np.minimum(body_alpha, 1.0 - rm)
+        if name in features:
+            # exact (eroded) hole so the face part sits flush, no gray ring
+            body_alpha = np.minimum(body_alpha, 1.0 - poly_mask((W, H), p["poly"], erode=True))
+        else:
+            # dilated hole for limbs so rotating parts never reveal a seam
+            body_alpha = np.minimum(body_alpha, 1.0 - dilate3(poly_mask((W, H), p["poly"], erode=True)))
     body_rgba = np.dstack([arr, (erode3(body_alpha) * 255).astype(np.uint8)])
     body_rgba = inpaint_patches(body_rgba, spec)
     # crop body to remaining silhouette
