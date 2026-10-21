@@ -62,32 +62,47 @@ def crop_part(rgba, mask, poly, pivot):
     return crop, (pivot[0] - x0, pivot[1] - y0)
 
 
+def dilate3(mask):
+    padded = np.pad(mask, 1, mode="edge")
+    out = np.zeros_like(mask)
+    for dy in (0, 1, 2):
+        for dx in (0, 1, 2):
+            out = np.maximum(out, padded[dy:dy + mask.shape[0], dx:dx + mask.shape[1]])
+    return out
+
+
 def inpaint_patches(rgba, spec):
-    """Erase each feature polygon on the body, fill with a copy from an offset."""
-    a = np.asarray(rgba).copy()
+    """Erase each feature polygon on the body, fill with ring-median color.
+
+    Ring median samples a 24px band just outside the hole; the body's blue
+    gradient is gentle enough that a flat fill + slight blur reads clean.
+    """
+    a = np.asarray(rgba).astype(np.float32).copy()
     H, W = a.shape[:2]
     for job in spec["inpaint"]:
         hole = next(p for p in spec["parts"] if p["name"] == job["hole"])
         hm = poly_mask((W, H), hole["poly"], erode=False) > 0.5
-        dx, dy = job["from"]
-        src = np.roll(np.roll(a, -dy, axis=0), -dx, axis=1)
-        # feather: blend patch in with a slightly shrunk mask so edges soften
-        soft = Image.fromarray((hm * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3))
+        ring = dilate3(dilate3(dilate3(hm))) & ~hm
+        if ring.sum() < 100:
+            continue
+        fill = np.median(a[ring], axis=0)
+        soft = Image.fromarray((hm * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(4))
         sf = (np.asarray(soft).astype(np.float32) / 255.0)[..., None]
-        a[hm] = (src * (1 - sf) + src * sf)[hm]
-        # ensure hole fully painted (center of mask)
-        a[hm] = src[hm]
-    return a
+        patch = np.empty_like(a)
+        patch[:] = fill
+        a = a * (1.0 - sf) + patch * sf
+    return a.astype(np.uint8)
 
 
 def draw_closed_eye(size, w, h):
-    """Cartoon closed-eye: thick downward arc + lash tick, black."""
+    """Cartoon closed-eye: thick downward-bowing arc (lid closed), black."""
     im = Image.new("RGBA", size, (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     black = (18, 18, 24, 255)
-    mx, my = w // 2, int(h * 0.35)
-    d.arc([4, my - h // 3, w - 4, my + h // 2], start=20, end=160, fill=black, width=max(6, h // 7))
-    d.line([(mx - w // 4, my + h // 5), (mx - w // 3, my + h // 3)], fill=black, width=max(5, h // 9))
+    lw = max(7, h // 6)
+    d.arc([6, h * 0.15, w - 6, h * 1.05], start=195, end=345, fill=black, width=lw)
+    mx = w // 2
+    d.line([(mx - w // 5, h * 0.62), (mx - w // 3, h * 0.78)], fill=black, width=max(5, lw - 2))
     return im
 
 
@@ -98,9 +113,10 @@ def draw_mouth_o(size, w, h):
     outline = (18, 18, 24, 255)
     cavity = (96, 22, 34, 255)
     teeth = (250, 250, 250, 255)
-    m = 6
-    d.ellipse([m, m, w - m, h - m], fill=cavity, outline=outline, width=max(6, h // 10))
-    d.rectangle([w * 0.22, m + 4, w * 0.78, m + h * 0.22], fill=teeth)
+    m = 8
+    d.ellipse([m, m, w - m, h - m], fill=cavity, outline=outline, width=max(7, h // 9))
+    d.rounded_rectangle([w * 0.24, m + h * 0.10, w * 0.76, m + h * 0.30],
+                        radius=h // 8, fill=teeth)
     return im
 
 
@@ -150,11 +166,14 @@ def main():
         }
         print(f"{p['name']}: {crop.size} pivot={pivot}")
 
-    # body = full keyed sprite minus every part polygon, features inpainted
+    # body = full keyed sprite minus every part polygon (dilated so no limb
+    # slivers survive at joints), features inpainted with ring-median fill
     body_alpha = alpha.copy()
     for name in spec["body_remove"]:
         p = next(q for q in spec["parts"] if q["name"] == name)
-        body_alpha = np.minimum(body_alpha, 1.0 - poly_mask((W, H), p["poly"], erode=False))
+        rm = poly_mask((W, H), p["poly"], erode=False)
+        rm = dilate3(dilate3(dilate3(rm)))  # ~6px dilation eats join slivers
+        body_alpha = np.minimum(body_alpha, 1.0 - rm)
     body_rgba = np.dstack([arr, (erode3(body_alpha) * 255).astype(np.uint8)])
     body_rgba = inpaint_patches(body_rgba, spec)
     # crop body to remaining silhouette
@@ -162,10 +181,10 @@ def main():
     x0, y0, x1, y1 = bbox_of(bmask.astype(np.float32), pad=8)
     body_crop = Image.fromarray(body_rgba[y0:y1, x0:x1], "RGBA")
     body_crop.save(os.path.join(args.out, "body.png"))
+    bp = spec.get("body_pivot", [(x0 + x1) // 2, y0 + int((y1 - y0) * 0.72)])
     manifest["parts"]["body"] = {
         "png": "body.png",
-        "pivot": [int(spec.get("body_pivot", [(x0 + x1) // 2, (y0 + y1) // 2])[0] - x0),
-                  int(spec.get("body_pivot", [(x0 + x1) // 2, (y0 + y1) // 2])[1] - y0)],
+        "pivot": [int(bp[0] - x0), int(bp[1] - y0)],
         "size": list(body_crop.size),
         "z": 10,
     }
