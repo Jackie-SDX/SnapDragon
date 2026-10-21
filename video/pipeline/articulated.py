@@ -335,7 +335,7 @@ def main():
     root_y = root.get("y", -1.9)
     root_x = root.get("x", 0.0)
     # shift whole rig: body pivot world + offset
-    bx, by = built["body"].location
+    bx, by = built["body"].location.x, built["body"].location.y
     dx, dy = root_x - bx, root_y - by
     for obj in built.values():
         if obj.parent is None:
