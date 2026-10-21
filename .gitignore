@@ -33,3 +33,6 @@ Thumbs.db
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Pipeline render output (uploaded as CI artifacts, never committed)
+work/

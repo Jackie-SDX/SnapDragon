@@ -113,7 +113,7 @@ def new_scene(width, height, fps, samples):
     return scene
 
 
-def make_material(name, tex_path=None, color=None):
+def make_material(name, tex_path=None, color=None, alpha=1.0):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -131,7 +131,7 @@ def make_material(name, tex_path=None, color=None):
         nt.links.new(tex.outputs["Alpha"], mix.inputs["Fac"])
     else:
         emit.inputs["Color"].default_value = (*color, 1.0)
-        mix.inputs["Fac"].default_value = 1.0
+        mix.inputs["Fac"].default_value = alpha
     nt.links.new(trans.outputs["BSDF"], mix.inputs[1])
     nt.links.new(emit.outputs["Emission"], mix.inputs[2])
     nt.links.new(mix.outputs["Shader"], out.inputs["Surface"])
@@ -181,8 +181,8 @@ def build_beat(scene, beat, tbeat, char_meta, chars_dir, seed_base):
         seed = seed_base + j * 17
         mat_sprite = make_material(f"m_{beat['id']}_{j}", tex_path=tex)
         sprite = add_plane(f"s_{beat['id']}_{j}", mat_sprite, w, h, (0, 0), 0.10)
-        mat_sh = make_material(f"ms_{beat['id']}_{j}", color=(0.05, 0.05, 0.08))
-        shadow = add_plane(f"sh_{beat['id']}_{j}", mat_sh, 1.0, 0.28, (0, 0), 0.02)
+        mat_sh = make_material(f"ms_{beat['id']}_{j}", color=(0.10, 0.10, 0.14), alpha=0.16)
+        shadow = add_plane(f"sh_{beat['id']}_{j}", mat_sh, 1.0, 0.22, (0, 0), 0.02)
         made.append((sprite, shadow, cfg, w, h, seed, t0, dur))
     return made
 
@@ -210,9 +210,7 @@ def animate_beat(items, f_start, f_end, fps):
 
             if enter == "slide_right":
                 p = slide_ease(t / 0.55)
-                dx += (x_final - slide_from) * p + slide_from - x_final
-                # ^ approach: x = slide_from + (x_final-slide_from)*p
-                dx = slide_from + (x_final - slide_from) * p - x_final
+                dx += slide_from + (x_final - slide_from) * p - x_final
             if move == "tremble":
                 tx, ty, trot = tremble(t, trem, seed)
                 dx += tx
@@ -254,7 +252,7 @@ def animate_beat(items, f_start, f_end, fps):
 
             shadow.location = (x_final + dx, y_feet + 0.02, 0.02)
             spread = 1.0 + (1.0 - sy) * 0.9
-            shadow.scale = (w * 0.55 * spread * max(sx, 0.4), 0.28, 1.0)
+            shadow.scale = (w * 0.55 * spread * max(sx, 0.4), 0.22, 1.0)
             shadow.keyframe_insert(data_path="location", frame=f)
             shadow.keyframe_insert(data_path="scale", frame=f)
 

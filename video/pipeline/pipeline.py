@@ -47,9 +47,8 @@ def main():
     ap.add_argument("--skip-assemble", action="store_true")
     args = ap.parse_args()
 
-    project = json.load(open(os.path.abspath(args.project)))
-
     project_path = os.path.abspath(args.project)
+    project = json.load(open(project_path))
     work = os.path.abspath(args.work)
     frames = os.path.join(work, "frames")
     os.makedirs(work, exist_ok=True)
