@@ -7,6 +7,10 @@ on:
         description: "Path to the puppet project JSON"
         required: true
         default: "video/projects/asthma-cast-poc.json"
+      renderer:
+        description: "Renderer: scene | puppet | articulated"
+        required: false
+        default: "puppet"
       samples:
         description: "EEVEE render samples per frame"
         required: false
@@ -51,21 +55,28 @@ jobs:
           path: work/voices
           key: piper-voice-en_US-joe-medium-v1
 
-      - name: Run pipeline (prep -> TTS -> Blender EEVEE puppet -> FFmpeg)
+      - name: Run pipeline (prep -> TTS -> Blender EEVEE -> FFmpeg)
         run: |
           set -euo pipefail
           python video/pipeline/pipeline.py \
             --project "${{ inputs.project }}" \
             --work work \
-            --renderer puppet \
+            --renderer "${{ inputs.renderer }}" \
             --samples "${{ inputs.samples }}"
 
       - name: Report timings
         if: always()
+        env:
+          RENDERER: ${{ inputs.renderer }}
         run: |
           set -euo pipefail
           {
-            echo "### Puppet PoC render report"
+            case "$RENDERER" in
+              articulated) label="Articulated rig" ;;
+              puppet)      label="Puppet PoC" ;;
+              *)           label="Scene" ;;
+            esac
+            echo "### ${label} render report"
             echo '```json'
             cat work/timings.json 2>/dev/null || echo '{}'
             echo '```'
@@ -78,7 +89,7 @@ jobs:
       - name: Upload video artifact
         uses: actions/upload-artifact@v4
         with:
-          name: puppet-poc
+          name: ${{ inputs.renderer == 'articulated' && 'salbutamol-rig' || 'puppet-poc' }}
           if-no-files-found: error
           path: |
             work/final.mp4

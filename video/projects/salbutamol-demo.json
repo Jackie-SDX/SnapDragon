@@ -29,7 +29,7 @@
       { "joint": "body", "action": "squash_event", "t": [5.6, 6.2], "amount": 0.18 },
       { "joint": "body", "action": "rot_seq", "t": [2.0, 3.1],
         "keys": [[2.0, 0.0], [2.35, 7.0], [2.7, -5.0], [3.1, 0.0]] },
-      { "joint": "body", "action": "rot", "t": [3.3, 5.3], "deg": 2.5, "osc_dummy": true },
+      { "joint": "body", "action": "osc", "t": [3.35, 5.2], "amp": 3.0, "hz": 1.6, "phase": 1.5708 },
       { "joint": "shoulder_l", "action": "rot", "t": [0.35, 0.95], "deg": -38.0 },
       { "joint": "shoulder_l", "action": "osc", "t": [0.95, 2.0], "amp": 10.0, "hz": 2.2 },
       { "joint": "shoulder_l", "action": "rot", "t": [4.8, 5.5], "deg": -14.0 },
