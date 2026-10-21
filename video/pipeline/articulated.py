@@ -210,6 +210,10 @@ def add_part(scene, name, png, info, origin, k, z_layer, parent=None):
     """Plane whose object origin sits exactly on the part's joint pivot."""
     w, h = info["size"]
     ppx, ppy = info["pivot"]
+    # ppx/ppy are crop-relative (for the mesh pivot offset); pivot_src is
+    # source-image absolute (for world placement)
+    ppx, ppy = info["pivot"]
+    spx, spy = info.get("pivot_src", info["pivot"])
     mat = make_material(f"m_{name}", tex_path=png)
     bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0, 0, 0))
     obj = bpy.context.active_object
@@ -221,7 +225,7 @@ def add_part(scene, name, png, info, origin, k, z_layer, parent=None):
     dx = (w / 2.0 - ppx) * k
     dy = -(h / 2.0 - ppy) * k
     obj.data.transform(Matrix.Translation((dx, dy, 0.0)))
-    wx, wy = px_to_world(ppx, ppy, origin, k)
+    wx, wy = px_to_world(spx, spy, origin, k)
     obj.location = (wx, wy, z_layer * 0.002)
     obj.data.materials.append(mat)
     if parent is not None:
@@ -379,10 +383,6 @@ def main():
                         e = ease_in_out((t - t0) / max(t1 - t0, 1e-6))
                         raise_px = g.get("px", 12) * math.sin(math.pi * e)
             obj = built[brow]
-            wx, wy = px_to_world(*manifest["parts"][brow]["pivot"], origin, k)
-            base = root_x + 0  # brows inherit body transform; use local delta
-            # local y offset in parent(body) space:
-            obj.location.z = obj.location.z  # keep z
             obj.delta_location = (0.0, raise_px * k, 0.0)
             obj.keyframe_insert(data_path="delta_location", frame=f)
 

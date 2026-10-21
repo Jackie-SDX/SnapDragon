@@ -161,6 +161,7 @@ def main():
         manifest["parts"][p["name"]] = {
             "png": p["name"] + ".png",
             "pivot": [int(pivot[0]), int(pivot[1])],
+            "pivot_src": [int(p["pivot"][0]), int(p["pivot"][1])],
             "size": list(crop.size),
             "z": p.get("z", 10),
         }
@@ -188,6 +189,7 @@ def main():
     manifest["parts"]["body"] = {
         "png": "body.png",
         "pivot": [int(bp[0] - x0), int(bp[1] - y0)],
+        "pivot_src": [int(bp[0]), int(bp[1])],
         "size": list(body_crop.size),
         "z": 10,
     }
