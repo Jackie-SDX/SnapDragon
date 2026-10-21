@@ -214,17 +214,21 @@ def add_part(scene, name, png, info, origin, k, z_layer, parent=None):
     bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0, 0, 0))
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (w * k, h * k, 1.0)
-    # shift verts so origin = pivot pixel (y flipped: pixel-down -> local-up)
-    dx = (w / 2.0 - ppx)
-    dy = -(h / 2.0 - ppy)
+    # scale verts to world size, then shift so origin = pivot pixel
+    # (y flipped: pixel-down -> local-up). Do NOT use object scale: the
+    # pivot offset would be multiplied by it and catapult the part away.
+    obj.data.transform(Matrix.Diagonal((w * k, h * k, 1.0, 1.0)))
+    dx = (w / 2.0 - ppx) * k
+    dy = -(h / 2.0 - ppy) * k
     obj.data.transform(Matrix.Translation((dx, dy, 0.0)))
     wx, wy = px_to_world(ppx, ppy, origin, k)
     obj.location = (wx, wy, z_layer * 0.002)
     obj.data.materials.append(mat)
     if parent is not None:
         obj.parent = parent
+        bpy.context.view_layer.update()
         obj.matrix_parent_inverse = parent.matrix_world.inverted()
+        bpy.context.view_layer.update()
     return obj
 
 
