@@ -1,0 +1,54 @@
+{
+  "fps": 24,
+  "render_width": 720,
+  "render_height": 1280,
+  "output_width": 1080,
+  "output_height": 1920,
+  "voice": { "id": "en_US-joe-medium", "length_scale": 1.02 },
+  "renderer": "articulated",
+  "rig_spec": "video/rigs/salbutamol_rig.json",
+  "stage": { "bg": [0.96, 0.965, 0.97], "view_height": 8.0 },
+  "camera": { "scale": [8.3, 7.3], "pan": [0.0, 0.35, 0.1, 0.25] },
+  "beats": [
+    {
+      "id": "demo",
+      "narration": "Point, wiggle, shuffle, and breathe. Easy."
+    }
+  ],
+  "rig": {
+    "x": 0.1,
+    "y": -1.85,
+    "blinks": [[1.35, 1.47], [3.55, 3.66], [5.55, 5.66]],
+    "mouth": {
+      "talk_segments": [[0.15, 1.3], [1.55, 3.5], [3.75, 5.45]],
+      "o_segments": [[4.35, 4.75]]
+    },
+    "gestures": [
+      { "joint": "body", "action": "squash_event", "t": [0.0, 0.55], "amount": 0.16 },
+      { "joint": "body", "action": "squash_event", "t": [2.05, 2.6], "amount": 0.12 },
+      { "joint": "body", "action": "squash_event", "t": [5.6, 6.2], "amount": 0.18 },
+      { "joint": "body", "action": "rot_seq", "t": [2.0, 3.1],
+        "keys": [[2.0, 0.0], [2.35, 7.0], [2.7, -5.0], [3.1, 0.0]] },
+      { "joint": "body", "action": "rot", "t": [3.3, 5.3], "deg": 2.5, "osc_dummy": true },
+      { "joint": "shoulder_l", "action": "rot", "t": [0.35, 0.95], "deg": -38.0 },
+      { "joint": "shoulder_l", "action": "osc", "t": [0.95, 2.0], "amp": 10.0, "hz": 2.2 },
+      { "joint": "shoulder_l", "action": "rot", "t": [4.8, 5.5], "deg": -14.0 },
+      { "joint": "wrist_l", "action": "osc", "t": [1.0, 2.0], "amp": 12.0, "hz": 3.4 },
+      { "joint": "wrist_l", "action": "rot", "t": [0.4, 0.95], "deg": 10.0 },
+      { "joint": "shoulder_r", "action": "osc", "t": [3.35, 5.2], "amp": 7.0, "hz": 1.8, "phase": 1.2 },
+      { "joint": "shoulder_r", "action": "rot", "t": [4.9, 5.5], "deg": 26.0 },
+      { "joint": "wrist_r", "action": "osc", "t": [3.4, 5.1], "amp": 9.0, "hz": 2.6, "phase": 0.5 },
+      { "joint": "hip_l", "action": "osc", "t": [3.35, 5.2], "amp": 11.0, "hz": 1.6 },
+      { "joint": "hip_r", "action": "osc", "t": [3.35, 5.2], "amp": 11.0, "hz": 1.6, "phase": 3.14159 },
+      { "joint": "ankle_l", "action": "osc", "t": [3.35, 5.2], "amp": -6.5, "hz": 1.6 },
+      { "joint": "ankle_r", "action": "osc", "t": [3.35, 5.2], "amp": -6.5, "hz": 1.6, "phase": 3.14159 },
+      { "joint": "canister", "action": "osc", "t": [0.6, 6.0], "amp": 2.5, "hz": 0.7 },
+      { "joint": "canister", "action": "rot", "t": [2.0, 2.5], "deg": -7.0 },
+      { "joint": "canister", "action": "rot", "t": [2.5, 3.05], "deg": 7.0 },
+      { "joint": "brow_l", "action": "raise", "t": [0.8, 1.5], "px": 14 },
+      { "joint": "brow_l", "action": "raise", "t": [2.0, 2.75], "px": 20 },
+      { "joint": "brow_r", "action": "raise", "t": [0.8, 1.5], "px": 10 },
+      { "joint": "brow_r", "action": "raise", "t": [2.0, 2.75], "px": 17 }
+    ]
+  }
+}

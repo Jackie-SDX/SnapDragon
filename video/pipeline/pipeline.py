@@ -41,7 +41,7 @@ def main():
     ap.add_argument("--project", required=True)
     ap.add_argument("--work", required=True)
     ap.add_argument("--samples", type=int, default=8)
-    ap.add_argument("--renderer", choices=["scene", "puppet"], default="scene")
+    ap.add_argument("--renderer", choices=["scene", "puppet", "articulated"], default="scene")
     ap.add_argument("--skip-tts", action="store_true")
     ap.add_argument("--skip-render", action="store_true")
     ap.add_argument("--skip-assemble", action="store_true")
@@ -68,6 +68,14 @@ def main():
             "--out", chars_dir,
             "--manifest", os.path.join(chars_dir, "manifest.json"),
         ])
+    elif args.renderer == "articulated":
+        log("Stage 0/3: split character rig (polygon parts -> RGBA)")
+        chars_dir = os.path.join(work, "rig")
+        timings["prep"] = run([
+            sys.executable, os.path.join(HERE, "split_char.py"),
+            "--spec", project["rig_spec"],
+            "--out", chars_dir,
+        ])
 
     if not args.skip_tts:
         log("Stage 1/3: narration (Piper TTS, free)")
@@ -82,10 +90,12 @@ def main():
     print(f"duration={timeline['total']}s frames={timeline['frames']}", flush=True)
 
     if not args.skip_render:
-        label = "2D puppet render" if args.renderer == "puppet" else "3D render"
+        label = {"puppet": "2D puppet render", "articulated": "articulated rig render"}.get(
+            args.renderer, "3D render")
         log(f"Stage 2/3: {label} (Blender EEVEE, headless)")
         blender = find_blender()
-        script = "puppet.py" if args.renderer == "puppet" else "scene.py"
+        script = {"puppet": "puppet.py", "articulated": "articulated.py"}.get(
+            args.renderer, "scene.py")
         cmd = [
             "xvfb-run", "-a", blender, "-b",
             "-P", os.path.join(HERE, script), "--",
@@ -94,7 +104,7 @@ def main():
             "--out", frames,
             "--samples", args.samples,
         ]
-        if args.renderer == "puppet":
+        if args.renderer in ("puppet", "articulated"):
             cmd += ["--chars", chars_dir]
         timings["render"] = run(cmd)
 
