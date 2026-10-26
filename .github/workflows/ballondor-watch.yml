@@ -1,0 +1,159 @@
+name: Ballon d’Or 2026 Winner Watch
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+  actions: write
+concurrency:
+  group: ballon-dor-2026-winner-watch
+  cancel-in-progress: false
+jobs:
+  verify-winner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check official result and independent reporting
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = 184;
+            const marker = '<!-- ballon-dor-winner-alert-sent -->';
+
+            const existingComments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number: issueNumber, per_page: 100 }
+            );
+            if (existingComments.some(c => (c.body || '').includes(marker))) {
+              console.log('Winner alert already sent; no duplicate notification.');
+              try {
+                await github.rest.actions.disableWorkflow({ owner, repo, workflow_id: 'ballondor-watch.yml' });
+              } catch (error) {
+                console.log('Workflow auto-disable was not available: ' + error.message);
+              }
+              return;
+            }
+
+            function decodeHtml(s) {
+              return s
+                .replace(/&nbsp;|&#160;/gi, ' ')
+                .replace(/&amp;/gi, '&')
+                .replace(/&quot;/gi, '"')
+                .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+                .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)))
+                .replace(/&apos;/gi, "'")
+                .replace(/&#39;/g, "'");
+            }
+            function plainText(s) {
+              return decodeHtml(
+                s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+                 .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+                 .replace(/>\s*</g, '> <')
+                 .replace(/<[^>]+>/g, ' ')
+              ).replace(/\s+/g, ' ').trim();
+            }
+
+            const officialUrl = 'https://ballondor.com/winners';
+            const officialResponse = await fetch(officialUrl, {
+              headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0 (+https://github.com/Jackie-SDX/SnapDragon)' }
+            });
+            if (!officialResponse.ok) throw new Error('Official results page returned HTTP ' + officialResponse.status);
+            const officialHtml = await officialResponse.text();
+            const officialText = plainText(officialHtml);
+            const match = officialText.match(/20\s*26\s+Winner\s+(.{1,80}?)\s+(?:2025|20\s*25)\b/i);
+            if (!match) {
+              console.log('Official results page format not recognized; no alert sent.');
+              return;
+            }
+
+            const winner = match[1].replace(/\s+/g, ' ').trim();
+            if (!winner ||
+                /^(?:\?+|winner|tba|to be announced|not announced|unknown|—|-|–)$/i.test(winner) ||
+                /to be announced|will be revealed|not yet announced/i.test(winner) ||
+                winner.length > 60) {
+              console.log('Official page still shows no confirmed 2026 men’s winner.');
+              return;
+            }
+            console.log('Official page candidate: ' + winner);
+
+            const query = '"' + winner + '" "Ballon d’Or" 2026 winner';
+            const rssUrl = 'https://news.google.com/rss/search?q=' +
+              encodeURIComponent(query) + '&hl=en-GB&gl=GB&ceid=GB:en';
+            const rssResponse = await fetch(rssUrl, {
+              headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0' }
+            });
+            if (!rssResponse.ok) throw new Error('News RSS returned HTTP ' + rssResponse.status);
+            const rss = await rssResponse.text();
+
+            function xmlValue(block, tag) {
+              const re = new RegExp('<' + tag + '\\b[^>]*>([\\s\\S]*?)<\\/' + tag + '>', 'i');
+              const found = block.match(re);
+              return found ? decodeHtml(found[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ')).trim() : '';
+            }
+            function normalize(s) {
+              return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            }
+            const winnerKey = normalize(winner).replace(/[^a-z0-9]/g, '');
+            const trustedDomain = /(^|\.)bbc\.(com|co\.uk)$|(^|\.)reuters\.com$|(^|\.)apnews\.com$|(^|\.)theguardian\.com$|(^|\.)espn\.com$|(^|\.)skysports\.com$|(^|\.)france24\.com$|(^|\.)lequipe\.fr$|(^|\.)cnn\.com$|(^|\.)nytimes\.com$|(^|\.)independent\.co\.uk$|(^|\.)dw\.com$|(^|\.)aljazeera\.com$/i;
+            const items = [...rss.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m => m[1]);
+            let confirmation = null;
+
+            for (const item of items) {
+              const title = xmlValue(item, 'title');
+              const link = xmlValue(item, 'link');
+              const sourceTag = (item.match(/<source\b[^>]*>[\s\S]*?<\/source>/i) || [])[0] || '';
+              const sourceName = xmlValue(sourceTag, 'source');
+              const sourceUrlMatch = sourceTag.match(/\burl=["']([^"']+)["']/i);
+              let host = '';
+              try {
+                host = new URL(sourceUrlMatch ? decodeHtml(sourceUrlMatch[1]) : '').hostname.toLowerCase();
+              } catch (_) {}
+              const titleKey = normalize(title).replace(/[^a-z0-9]/g, '');
+              const hasWinnerLanguage = /\b(win|wins|won|winner|winners|crowned|claims|claimed|lifts|lifted|awarded|named)\b/i.test(title);
+              const hasAward = titleKey.includes('ballondor');
+              if (trustedDomain.test(host) &&
+                  titleKey.includes(winnerKey) &&
+                  hasAward &&
+                  hasWinnerLanguage &&
+                  !/\b(leak|mistake|accidentally|fake|rumou?r|prediction|predicts|could win|to win)\b/i.test(title)) {
+                confirmation = { title, link, sourceName, host };
+                break;
+              }
+            }
+
+            if (!confirmation) {
+              console.log('No trusted independent report corroborates ' + winner + ' yet; checking again in five minutes.');
+              return;
+            }
+
+            const body = '@Jackie-SDX 🔔 **Confirmed: ' + winner +
+              ' won the 2026 men’s Ballon d’Or.**\n\n' +
+              'Official results: ' + officialUrl + '\n\n' +
+              'Independent confirmation (' + (confirmation.sourceName || confirmation.host) + '): ' +
+              confirmation.link + '\n\n' +
+              'The winner’s name matched on the official results page and in a reputable independent report.\n\n' + marker;
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: issueNumber, body
+            });
+            console.log('Verified winner alert posted to issue #' + issueNumber + '.');
+
+            try {
+              await github.rest.issues.update({
+                owner, repo, issue_number: issueNumber, state: 'closed'
+              });
+            } catch (error) {
+              console.log('Could not close alert issue: ' + error.message);
+            }
+            try {
+              await github.rest.actions.disableWorkflow({
+                owner, repo, workflow_id: 'ballondor-watch.yml'
+              });
+              console.log('Watcher disabled after the verified alert.');
+            } catch (error) {
+              console.log('Could not auto-disable watcher: ' + error.message);
+            }
