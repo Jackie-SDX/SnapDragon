@@ -56,6 +56,38 @@ jobs:
                  .replace(/<[^>]+>/g, ' ')
               ).replace(/\s+/g, ' ').trim();
             }
+            function candidateFromText(raw, fetchedFrom) {
+              if (fetchedFrom.includes('r.jina.ai')) {
+                const lines = raw.split(/\r?\n/);
+                for (let i = 0; i < lines.length; i++) {
+                  const line = lines[i].trim();
+                  if (!/^Winner(?:\s|$)/i.test(line)) continue;
+                  const surrounding = lines.slice(Math.max(0, i - 5), i).join(' ');
+                  if (!/(?:20\s*26|2026)/i.test(surrounding)) continue;
+                  let value = line.replace(/^Winner\b\s*/i, '').trim();
+                  if (!value) {
+                    for (let j = i + 1; j < Math.min(lines.length, i + 4); j++) {
+                      const next = lines[j].trim();
+                      if (!next) continue;
+                      if (/^(?:!\[|\[!\[|20\s*25|2025|##?\s)/i.test(next)) break;
+                      value = next;
+                      break;
+                    }
+                  }
+                  value = value
+                    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+                    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+                    .replace(/[*_]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                  if (value) return value;
+                }
+                return '';
+              }
+              const text = plainText(raw);
+              const match = text.match(/20\s*26\s+Winner\s+(.{1,80}?)\s+(?:2025|20\s*25)\b/i);
+              return match ? match[1].replace(/\s+/g, ' ').trim() : '';
+            }
 
             const officialUrl = 'https://ballondor.com/winners';
             const officialCandidates = [
@@ -69,7 +101,8 @@ jobs:
             for (const url of officialCandidates) {
               try {
                 const response = await fetch(url, {
-                  headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0' }
+                  headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0' },
+                  signal: AbortSignal.timeout(12000)
                 });
                 if (!response.ok) {
                   console.log('Could not fetch ' + url + ': HTTP ' + response.status);
@@ -78,7 +111,7 @@ jobs:
                 const raw = await response.text();
                 const candidateText = plainText(raw);
                 if (/ballon/i.test(candidateText) && /2026/.test(candidateText) && /winner/i.test(candidateText)) {
-                  officialText = candidateText;
+                  officialText = raw;
                   fetchedFrom = url;
                   break;
                 }
@@ -91,18 +124,12 @@ jobs:
             }
             console.log('Read official results content through: ' + fetchedFrom);
 
-            const match = officialText.match(/20\s*26\s+Winner\s+(.{1,80}?)\s*(?:\[\s*)?(?:2025|20\s*25)\b/i);
-            if (!match) {
-              console.log('Official results page format not recognized; no alert sent.');
-              return;
-            }
-
-            const winner = match[1].replace(/\s+/g, ' ').trim().replace(/[\[\]()]+$/g, '');
+            const winner = candidateFromText(officialText, fetchedFrom);
             if (!winner ||
                 /^(?:\?+|winner|tba|to be announced|not announced|unknown|—|-|–)$/i.test(winner) ||
                 /to be announced|will be revealed|not yet announced/i.test(winner) ||
                 winner.length > 60) {
-              console.log('Official page still shows no confirmed 2026 men’s winner.');
+              console.log('Official page still shows no confirmed 2026 men’s winner, or its format is not yet recognized.');
               return;
             }
             console.log('Official page candidate: ' + winner);
@@ -111,7 +138,8 @@ jobs:
             const rssUrl = 'https://news.google.com/rss/search?q=' +
               encodeURIComponent(query) + '&hl=en-GB&gl=GB&ceid=GB:en';
             const rssResponse = await fetch(rssUrl, {
-              headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0' }
+              headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0' },
+              signal: AbortSignal.timeout(12000)
             });
             if (!rssResponse.ok) throw new Error('News RSS returned HTTP ' + rssResponse.status);
             const rss = await rssResponse.text();
