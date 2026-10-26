@@ -58,19 +58,46 @@ jobs:
             }
 
             const officialUrl = 'https://ballondor.com/winners';
-            const officialResponse = await fetch(officialUrl, {
-              headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0 (+https://github.com/Jackie-SDX/SnapDragon)' }
-            });
-            if (!officialResponse.ok) throw new Error('Official results page returned HTTP ' + officialResponse.status);
-            const officialHtml = await officialResponse.text();
-            const officialText = plainText(officialHtml);
-            const match = officialText.match(/20\s*26\s+Winner\s+(.{1,80}?)\s+(?:2025|20\s*25)\b/i);
+            const officialCandidates = [
+              'https://r.jina.ai/http://ballondor.com/winners',
+              'https://ballondor-com.translate.goog/winners?_x_tr_sl=auto&_x_tr_tl=en&_x_tr_hl=en',
+              'https://www.ballondor.com/winners',
+              officialUrl
+            ];
+            let officialText = '';
+            let fetchedFrom = '';
+            for (const url of officialCandidates) {
+              try {
+                const response = await fetch(url, {
+                  headers: { 'User-Agent': 'BallonDorWinnerWatch/1.0' }
+                });
+                if (!response.ok) {
+                  console.log('Could not fetch ' + url + ': HTTP ' + response.status);
+                  continue;
+                }
+                const raw = await response.text();
+                const candidateText = plainText(raw);
+                if (/ballon/i.test(candidateText) && /2026/.test(candidateText) && /winner/i.test(candidateText)) {
+                  officialText = candidateText;
+                  fetchedFrom = url;
+                  break;
+                }
+              } catch (error) {
+                console.log('Could not fetch ' + url + ': ' + error.message);
+              }
+            }
+            if (!officialText) {
+              throw new Error('Could not retrieve the official winners page through any available route.');
+            }
+            console.log('Read official results content through: ' + fetchedFrom);
+
+            const match = officialText.match(/20\s*26\s+Winner\s+(.{1,80}?)\s*(?:\[\s*)?(?:2025|20\s*25)\b/i);
             if (!match) {
               console.log('Official results page format not recognized; no alert sent.');
               return;
             }
 
-            const winner = match[1].replace(/\s+/g, ' ').trim();
+            const winner = match[1].replace(/\s+/g, ' ').trim().replace(/[\[\]()]+$/g, '');
             if (!winner ||
                 /^(?:\?+|winner|tba|to be announced|not announced|unknown|—|-|–)$/i.test(winner) ||
                 /to be announced|will be revealed|not yet announced/i.test(winner) ||
