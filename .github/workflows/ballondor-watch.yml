@@ -44,9 +44,9 @@ jobs:
                 .replace(/&amp;/gi, '&')
                 .replace(/&quot;/gi, '"')
                 .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
-                .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)))
+                .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
                 .replace(/&apos;/gi, "'")
-                .replace(/&#39;/g, "'");
+                .replace(/&#39;/gi, "'");
             }
             function plainText(s) {
               return decodeHtml(
@@ -74,7 +74,9 @@ jobs:
                       break;
                     }
                   }
-                  value = value
+                  // The proxy can put a player's image caption on the same line as the
+                  // winner label. Strip it before interpreting the actual winner name.
+                  value = value.split(/\[!\[|!\[/, 1)[0]
                     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
                     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
                     .replace(/[*_]/g, '')
@@ -129,7 +131,7 @@ jobs:
                 /^(?:\?+|winner|tba|to be announced|not announced|unknown|—|-|–)$/i.test(winner) ||
                 /to be announced|will be revealed|not yet announced/i.test(winner) ||
                 winner.length > 60) {
-              console.log('Official page still shows no confirmed 2026 men’s winner, or its format is not yet recognized.');
+              console.log('Official results currently contain no extractable, confirmed 2026 men’s winner; no alert sent.');
               return;
             }
             console.log('Official page candidate: ' + winner);
